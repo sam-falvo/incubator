@@ -77,7 +77,7 @@ class Compiler:
         tree = parse(script, self.parser_config)
         for node in tree:
             if is_pair(node):
-                if node.car in ['-', '+', '/', '*']:
+                if node.car in ['-', '+', '/', '*', '&', '|', '^']:
                     self.cg_expression(node, DD_HL, CD_RET)
                 else:
                     raise ValueError("Unsupported: {}".format(node.car))
@@ -89,15 +89,6 @@ class Compiler:
 
         for line in self.assembly_listing:
             print(line)
-
-    def cg_expression_lhs(self, node, dd, cd):
-        if is_pair(node):
-            self.cg_push_de()
-            self.cg_expression(node, DD_HL, CD_NEXT)
-            self.cg_pop_de()
-            self.cg_goto(cd)
-        else:
-            self.cg_expression(node, DD_HL, cd)
 
     def cg_binop(self, op, node, dd, cd):
         if is_pair(node.cdr.car):
@@ -120,6 +111,12 @@ class Compiler:
                 self.cg_binop(self.cg_multiply, node, dd, cd)
             elif node.car == '/':
                 self.cg_binop(self.cg_divide, node, dd, cd)
+            elif node.car == '&':
+                self.cg_binop(self.cg_bit_and, node, dd, cd)
+            elif node.car == '|':
+                self.cg_binop(self.cg_bit_or, node, dd, cd)
+            elif node.car == '^':
+                self.cg_binop(self.cg_bit_xor, node, dd, cd)
             else:
                 raise ValueError("Syntax error: {}".format(node.car))
         else:
@@ -153,14 +150,25 @@ class Compiler:
             do_add(dd, ds1, ds2)
         self.cg_goto(cd)
 
-    def cg_subtract(self, dd, ds1, ds2, cd):
+    def cg_op16(self, dd, ds1, ds2, cg, op1, op2):
         self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[1]))
-        self.asm(None, "SUB", "A,{}".format(self.to_reg(ds2)[1]))
+        self.asm(None, op1, "A,{}".format(self.to_reg(ds2)[1]))
         self.asm(None, "LD", "{},A".format(self.to_reg(dd)[1]))
         self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[0]))
-        self.asm(None, "SBC", "A,{}".format(self.to_reg(ds2)[0]))
+        self.asm(None, op2, "A,{}".format(self.to_reg(ds2)[0]))
         self.asm(None, "LD", "{},A".format(self.to_reg(dd)[0]))
-        self.cg_goto(cd)
+
+    def cg_bit_and(self, dd, ds1, ds2, cd):
+        self.cg_op16(dd, ds1, ds2, cd, 'AND', 'AND')
+
+    def cg_bit_or(self, dd, ds1, ds2, cd):
+        self.cg_op16(dd, ds1, ds2, cd, 'OR', 'OR')
+
+    def cg_bit_xor(self, dd, ds1, ds2, cd):
+        self.cg_op16(dd, ds1, ds2, cd, 'XOR', 'XOR')
+
+    def cg_subtract(self, dd, ds1, ds2, cd):
+        self.cg_op16(dd, ds1, ds2, cd, 'SUB', 'SBC')
 
     def cg_divide(self, dd, ds1, ds2, cd):
         self.cg_call_libfn("divide_{}_{}".format(self.to_reg(ds1), self.to_reg(ds2)), cd)
