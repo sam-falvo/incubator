@@ -3,6 +3,8 @@
 
 import sys
 
+import attr
+
 from s_expression_parser import parse, ParserConfig, Pair, nil
 
 
@@ -53,7 +55,7 @@ def to_number(t):
                     return int(t[2:], 8)
                 elif t[1] in ['b', 'B']:
                     return int(t[2:], 2)
-            return int(t[1:], 8)
+            return int(t, 8)
         elif '1' <= t[0] <= '9':
             return int(t, 10)
     else:
@@ -64,6 +66,7 @@ class Compiler:
     def __init__(self):
         self.parser_config = ParserConfig({}, dots_are_cons=True)
         self.assembly_listing = None
+        self.globals = list()
 
     def main(self, script=None):
         self.assembly_listing = []
@@ -76,32 +79,11 @@ class Compiler:
 
         tree = parse(script, self.parser_config)
         for node in tree:
-            if is_pair(node):
-                if node.car in ['-', '+', '/', '*', '&', '|', '^']:
-                    self.cg_expression(node, DD_HL, CD_RET)
-                else:
-                    raise ValueError("Unsupported: {}".format(node.car))
-            else:
-                if starts_with_decimal_digit(node):
-                    self.cg_primary(node, DD_HL, CD_RET)
-                else:
-                    raise ValueError("Syntax error: {}".format(node))
-
+            self.cg_form(node, DD_HL, CD_RET)
         for line in self.assembly_listing:
             print(line)
 
-    def cg_binop(self, op, node, dd, cd):
-        if is_pair(node.cdr.car):
-            self.cg_expression(node.cdr.cdr.car, DD_HL, CD_NEXT)
-            self.cg_push_hl()
-            self.cg_expression(node.cdr.car, DD_HL, CD_NEXT)
-            self.cg_pop_de()
-        else:
-            self.cg_expression(node.cdr.cdr.car, DD_DE, CD_NEXT)
-            self.cg_expression(node.cdr.car, DD_HL, CD_NEXT)
-        op(dd, DD_HL, DD_DE, cd)
-
-    def cg_expression(self, node, dd, cd):
+    def cg_form(self, node, dd, cd):
         if is_pair(node):
             if node.car == '+':
                 self.cg_binop(self.cg_add, node, dd, cd)
@@ -117,19 +99,66 @@ class Compiler:
                 self.cg_binop(self.cg_bit_or, node, dd, cd)
             elif node.car == '^':
                 self.cg_binop(self.cg_bit_xor, node, dd, cd)
+            elif node.car == 'int16':
+                self.declare_variables(node)
+            elif node.car == 'set':
+                self.cg_set_var(node, dd, cd)
             else:
-                raise ValueError("Syntax error: {}".format(node.car))
+                raise ValueError("Unsupported: {}".format(node.car))
         else:
-            self.cg_primary(node, dd, cd)
+            if starts_with_decimal_digit(node):
+                n = to_number(node)
 
-    def cg_primary(self, t, dd, cd):
-        n = to_number(t)
+                if dd in [DD_BC, DD_DE, DD_HL]:
+                    self.cg_ld16(dd, n)
+                else:
+                    raise ValueError("Unknown data destination: {}".format(dd))
+            else:
+                if node in self.globals:
+                    self.cg_ld16_gv(dd, node)
+                else:
+                    raise ValueError("Symbol not declared: {}".format(node))
 
-        if dd in [DD_BC, DD_DE, DD_HL]:
-            self.cg_ld16(dd, n)
+    def declare_variables(self, node):
+        varlist = node.cdr
+        while varlist is not nil:
+            if varlist.car in self.globals:
+                raise ValueError("Variable already defined: {}".format(varlist.car))
+            self.globals.append(varlist.car)
+            self.asm(varlist.car, "DEFW", "0")
+            varlist = varlist.cdr
+
+    def cg_set_var(self, node, dd, cd):
+        # (set VAR EXPR_hl)
+        v = node.cdr.car
+        e = node.cdr.cdr.car
+
+        self.cg_form(e, DD_HL, CD_NEXT)
+        self.asm(None, "LD", "({}),HL".format(v))
+        self.cg_ld16_r16(dd, DD_HL)
+        self.cg_goto(cd)
+
+    def cg_binop(self, op, node, dd, cd):
+        if is_pair(node.cdr.car):
+            self.cg_form(node.cdr.cdr.car, DD_HL, CD_NEXT)
+            self.cg_push_hl()
+            self.cg_form(node.cdr.car, DD_HL, CD_NEXT)
+            self.cg_pop_de()
         else:
-            raise ValueError("Unknown data destination: {}".format(dd))
+            self.cg_form(node.cdr.cdr.car, DD_DE, CD_NEXT)
+            self.cg_form(node.cdr.car, DD_HL, CD_NEXT)
+        op(dd, DD_HL, DD_DE, cd)
 
+    def cg_ld16_gv(self, dd, t):
+        self.asm(None, "LD", "{},({})".format(self.to_reg(dd), t))
+
+    def cg_op16(self, dd, ds1, ds2, cd, op1, op2):
+        self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[1]))
+        self.asm(None, op1, "A,{}".format(self.to_reg(ds2)[1]))
+        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[1]))
+        self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[0]))
+        self.asm(None, op2, "A,{}".format(self.to_reg(ds2)[0]))
+        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[0]))
         self.cg_goto(cd)
 
     def cg_add(self, dd, ds1, ds2, cd):
@@ -137,26 +166,13 @@ class Compiler:
             if (d == DD_HL) and (a == DD_HL):
                 self.asm(None, "ADD", "HL,{}".format(self.to_reg(b)))
             else:
-                self.asm(None, "LD", "A,{}".format(self.to_reg(a)[1]))
-                self.asm(None, "ADD", "A,{}".format(self.to_reg(b)[1]))
-                self.asm(None, "LD", "{},A".format(self.to_reg(d)[1]))
-                self.asm(None, "LD", "A,{}".format(self.to_reg(a)[0]))
-                self.asm(None, "ADC", "A,{}".format(self.to_reg(b)[0]))
-                self.asm(None, "LD", "{},A".format(self.to_reg(d)[0]))
+                self.cg_op16(dd, ds1, ds2, cd, "ADD", "ADC")
 
         if (dd == DD_HL) and (ds2 == DD_HL):
             do_add(dd, ds2, ds1)
         else:
             do_add(dd, ds1, ds2)
         self.cg_goto(cd)
-
-    def cg_op16(self, dd, ds1, ds2, cg, op1, op2):
-        self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[1]))
-        self.asm(None, op1, "A,{}".format(self.to_reg(ds2)[1]))
-        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[1]))
-        self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[0]))
-        self.asm(None, op2, "A,{}".format(self.to_reg(ds2)[0]))
-        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[0]))
 
     def cg_bit_and(self, dd, ds1, ds2, cd):
         self.cg_op16(dd, ds1, ds2, cd, 'AND', 'AND')
