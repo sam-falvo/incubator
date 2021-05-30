@@ -19,13 +19,14 @@ DD_BC = 1
 DD_DE = 2
 DD_HL = 3
 DD_TMP = 4
+DD_ZFLAG = 5
 
 # Control Destinations
 # RET implies a return after the current expression or statement.
-
+# Control destinations >= CD_LABEL refer to locally generated labels.
 CD_RET = 0
 CD_NEXT = 1
-
+CD_LABEL = 100
 
 def starts_with_decimal_digit(t):
     return '0' <= t[0] <= '9'
@@ -67,15 +68,14 @@ class Compiler:
         self.parser_config = ParserConfig({}, dots_are_cons=True)
         self.assembly_listing = None
         self.globals = list()
+        self.next_label = CD_LABEL - 1
+
+    def make_label(self):
+        self.next_label = self.next_label + 1
+        return self.next_label
 
     def main(self, script=None):
         self.assembly_listing = []
-
-        if script is None:
-            script = "(* (/ (- 101 32) 180) 100)"
-
-        print(script)
-        print()
 
         tree = parse(script, self.parser_config)
         for node in tree:
@@ -84,7 +84,12 @@ class Compiler:
             print(line)
 
     def cg_form(self, node, dd, cd):
-        if is_pair(node):
+        if dd == DD_ZFLAG:
+            self.cg_form(node, DD_HL, CD_NEXT)
+            self.asm(None, "LD", "A,L")
+            self.asm(None, "OR", "A,H")
+            self.cg_goto(cd)
+        elif is_pair(node):
             if node.car == '+':
                 self.cg_binop(self.cg_add, node, dd, cd)
             elif node.car == '-':
@@ -103,6 +108,8 @@ class Compiler:
                 self.declare_variables(node)
             elif node.car == 'set':
                 self.cg_set_var(node, dd, cd)
+            elif node.car == 'if':
+                self.cg_if(node, dd, cd)
             else:
                 raise ValueError("Unsupported: {}".format(node.car))
         else:
@@ -118,6 +125,39 @@ class Compiler:
                     self.cg_ld16_gv(dd, node)
                 else:
                     raise ValueError("Symbol not declared: {}".format(node))
+
+    def cg_statements(self, node, dd, cd):
+        while node is not nil:
+            self.cg_form(node.car, next_target, next_step)
+            node = node.cdr
+
+    def cg_if(self, node, dd, cd):
+        # (if PRED CONSEQ ALTERopt)
+        label_false = self.make_label()
+        label_end = self.make_label()
+
+        pred = node.cdr.car
+        conseq = node.cdr.cdr.car
+        alter = None
+        if node.cdr.cdr.cdr is not nil:
+            alter = node.cdr.cdr.cdr.car
+
+        if alter is None:
+            if cd != CD_RET:
+                self.cg_form(pred, DD_ZFLAG, (CD_NEXT, label_false))
+                self.cg_form(conseq, DD_HL, cd)
+                self.cg_emit_label(label_false)
+                self.cg_goto(cd)
+            else:
+                self.cg_form(pred, DD_ZFLAG, (CD_NEXT, cd))
+                self.cg_form(conseq, DD_HL, cd)
+        else:
+            self.cg_form(pred, DD_ZFLAG, (CD_NEXT, label_false))
+            self.cg_form(conseq, DD_HL, label_end)
+            self.cg_emit_label(label_false)
+            self.cg_form(alter, DD_HL, CD_NEXT)
+            self.cg_emit_label(label_end)
+            self.cg_goto(cd)
 
     def declare_variables(self, node):
         varlist = node.cdr
@@ -219,10 +259,31 @@ class Compiler:
         self.asm(None, "LD", "{},{}".format(rd, rs))
 
     def cg_goto(self, cd):
-        if cd == CD_NEXT:
+        if isinstance(cd, tuple):
+            true_branch = cd[0]
+            false_branch = cd[1]
+
+            if true_branch == CD_NEXT:
+                if false_branch == CD_NEXT:
+                    pass
+                elif false_branch == CD_RET:
+                    self.asm(None, "RET", "NZ")
+                else:
+                    self.asm(None, "JP", "NZ,L{}".format(false_branch))
+            elif true_branch == CD_RET:
+                if false_branch == CD_NEXT:
+                    self.asm(None, "RET", "Z")
+                elif false_branch == CD_RET:
+                    self.cg_goto(CD_RET)
+                else:
+                    self.asm(None, "RET", "Z")
+                    self.cg_goto(false_branch)
+        elif cd == CD_NEXT:
             pass
         elif cd == CD_RET:
             self.asm(None, "RET", None)
+        elif cd >= CD_LABEL:
+            self.asm(None, "JP", "L{}".format(cd))
         else:
             raise ValueError("Unknown control destination: {}".format(cd))
 
@@ -235,9 +296,14 @@ class Compiler:
     def cg_pop_de(self):
         self.asm(None, "POP", "DE")
 
+    def cg_emit_label(self, l):
+        if l is not None:
+            if isinstance(l, int):
+                l = "L{}".format(l)
+            self.assembly_listing.append("{}:".format(l))
+
     def asm(self, label, mnem, oper):
-        if label is not None:
-            self.assembly_listing.append("{}:".format(label))
+        self.cg_emit_label(label)
         if oper is None:
             oper = ""
         self.assembly_listing.append("    {:6} {}".format(mnem, oper))
