@@ -114,6 +114,16 @@ class Compiler:
                 self.cg_sub(node, dd, CD_RET)
             elif node.car == 'do':
                 self.cg_statements(node.cdr, dd, CD_RET)
+            elif node.car == '@':
+                self.cg_address_of(node, dd, cd)
+            elif node.car == 'poke':
+                self.cg_poke(node, dd, cd)
+            elif node.car == 'peek':
+                self.cg_peek(node, dd, cd)
+            elif node.car == 'output': # Intel/Z80 specific
+                self.cg_output(node, dd, cd)
+            elif node.car == 'input': # Intel/Z80 specific
+                self.cg_input(node, dd, cd)
             else:
                 if node.car not in self.globals:
                     raise ValueError("Unsupported: {}".format(node.car))
@@ -126,7 +136,15 @@ class Compiler:
             if starts_with_decimal_digit(node):
                 n = to_number(node)
 
-                if dd in [DD_BC, DD_DE, DD_HL]:
+                if dd in [DD_A, DD_BC, DD_DE, DD_HL]:
+                    self.cg_ld16(dd, n)
+                    self.cg_goto(cd)
+                else:
+                    raise ValueError("Unknown data destination: {}".format(dd))
+            elif node[0] == '-':
+                n = -to_number(node[1:])
+
+                if dd in [DD_A, DD_BC, DD_DE, DD_HL]:
                     self.cg_ld16(dd, n)
                     self.cg_goto(cd)
                 else:
@@ -137,6 +155,144 @@ class Compiler:
                     self.cg_goto(cd)
                 else:
                     raise ValueError("Symbol not declared: {}".format(node))
+
+    def cg_input(self, node, dd, cd):
+        # (input SIZE ADDR)
+        sz = node.cdr.car
+        addr = node.cdr.cdr.car
+
+        if sz == 'byte':
+            dst = self.to_reg(dd)
+            self.cg_form(addr, DD_BC, CD_NEXT)
+            if dd == DD_A:
+                self.asm(None, "IN", "A,(C)")
+            else:
+                self.asm(None, "IN", "A,(C)")
+                self.asm(None, "LD", "{},A".format(dst[1]))
+                self.asm(None, "LD", "{},0".format(dst[0]))
+        elif sz == 'word':
+            dst = self.to_reg(dd)
+            if dd == DD_BC:
+                self.cg_input(node, DD_HL, CD_NEXT)
+                self.asm(None, "LD", "B,H")
+                self.asm(None, "LD", "C,L")
+                self.cg_goto(cd)
+            else:
+                self.cg_form(addr, DD_BC, CD_NEXT)
+            if dd == DD_A:  # we're reading a word, but something else is truncating it to a byte.
+                self.asm(None, "IN", "A,(C)")
+            else:
+                self.asm(None, "IN", "A,(C)")
+                self.asm(None, "LD", "{},A".format(dst[1]))
+                self.asm(None, "INC", "BC")
+                self.asm(None, "IN", "A,(C)")
+                self.asm(None, "LD", "{},A".format(dst[0]))
+        else:
+            raise ValueError("Unsupported poke size: {}".format(sz))
+
+        self.cg_goto(cd)
+
+    def cg_output(self, node, dd, cd):
+        # (output SIZE ADDR DATUM)
+        sz = node.cdr.car
+        addr = node.cdr.cdr.car
+        datum = node.cdr.cdr.cdr.car
+
+        if sz == 'byte':
+            self.cg_form(addr, DD_BC, CD_NEXT)
+            self.cg_form(datum, DD_A, CD_NEXT)
+            self.asm(None, "OUT", "(C),A")
+            self.cg_goto(cd)
+        elif sz == 'word':
+            if not is_pair(addr):
+                self.cg_form(datum, DD_DE, CD_NEXT)
+                self.cg_form(addr, DD_BC, CD_NEXT)
+            else:
+                self.cg_form(datum, DD_HL, CD_NEXT)
+                self.cg_push_hl()
+                self.cg_form(addr, DD_BC, CD_NEXT)
+                self.cg_pop_de()
+            self.asm(None, "LD", "A,E")
+            self.asm(None, "OUT", "(C),A")
+            self.asm(None, "INC", "BC")
+            self.asm(None, "LD", "A,D")
+            self.asm(None, "OUT", "(C),A")
+            self.cg_goto(cd)
+        else:
+            raise ValueError("Unsupported poke size: {}".format(sz))
+
+    def cg_peek(self, node, dd, cd):
+        # (peek SIZE ADDR)
+        sz = node.cdr.car
+        addr = node.cdr.cdr.car
+
+        if sz == 'byte':
+            dst = self.to_reg(dd)
+            self.cg_form(addr, DD_HL, CD_NEXT)
+            if dd == DD_A:
+                self.asm(None, "LD", "A,(HL)")
+            else:
+                self.asm(None, "LD", "{},(HL)".format(dst[1]))
+                self.asm(None, "LD", "{},0".format(dst[0]))
+        elif sz == 'word':
+            dst = self.to_reg(dd)
+            if dd == DD_HL:
+                src = "DE"
+                self.cg_form(addr, DD_DE, CD_NEXT)
+            else:
+                src = "HL"
+                self.cg_form(addr, DD_HL, CD_NEXT)
+            if dd == DD_A:  # we're reading a word, but something else is truncating it to a byte.
+                self.asm(None, "LD", "A,({})".format(src))
+            else:
+                self.asm(None, "LD", "{},({})".format(dst[1], src))
+                self.asm(None, "INC", src)
+                self.asm(None, "LD", "{},({})".format(dst[0], src))
+        else:
+            raise ValueError("Unsupported poke size: {}".format(sz))
+
+        self.cg_goto(cd)
+
+    def cg_poke(self, node, dd, cd):
+        # (poke SIZE ADDR DATUM)
+        sz = node.cdr.car
+        addr = node.cdr.cdr.car
+        datum = node.cdr.cdr.cdr.car
+
+        if sz == 'byte':
+            self.cg_form(addr, DD_HL, CD_NEXT)
+            self.cg_form(datum, DD_A, CD_NEXT)
+            self.asm(None, "LD", "(HL),A")
+            self.cg_goto(cd)
+        elif sz == 'word':
+            if not is_pair(addr):
+                self.cg_form(datum, DD_DE, CD_NEXT)
+                self.cg_form(addr, DD_HL, CD_NEXT)
+            else:
+                self.cg_form(datum, DD_HL, CD_NEXT)
+                self.cg_push_hl()
+                self.cg_form(addr, DD_HL, CD_NEXT)
+                self.cg_pop_de()
+            self.asm(None, "LD", "A,E")
+            self.asm(None, "LD", "(HL),A")
+            self.asm(None, "INC", "HL")
+            self.asm(None, "LD", "A,D")
+            self.asm(None, "LD", "(HL),A")
+            # self.asm(None, "DEC", "HL")  # Leave HL undefined??
+            self.cg_goto(cd)
+        else:
+            raise ValueError("Unsupported poke size: {}".format(sz))
+
+    def cg_address_of(self, node, dd, cd):
+        # (@ VAR)
+        v = node.cdr
+        if v is nil:
+            raise ValueError("@ operator missing variable or procedure name")
+        elif v.car not in self.globals:
+            raise ValueError("@ operator reference to undeclared variable or procedure: {}".format(v.car))
+        else:
+            self.cg_ld16(dd, v.car)
+            self.cg_goto(cd)
 
     def cg_statements(self, node, dd, cd):
         return_handled = False
@@ -227,10 +383,11 @@ class Compiler:
     def cg_op16(self, dd, ds1, ds2, cd, op1, op2):
         self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[1]))
         self.asm(None, op1, "A,{}".format(self.to_reg(ds2)[1]))
-        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[1]))
-        self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[0]))
-        self.asm(None, op2, "A,{}".format(self.to_reg(ds2)[0]))
-        self.asm(None, "LD", "{},A".format(self.to_reg(dd)[0]))
+        if dd != DD_A:
+            self.asm(None, "LD", "{},A".format(self.to_reg(dd)[1]))
+            self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[0]))
+            self.asm(None, op2, "A,{}".format(self.to_reg(ds2)[0]))
+            self.asm(None, "LD", "{},A".format(self.to_reg(dd)[0]))
         self.cg_goto(cd)
 
     def cg_add(self, dd, ds1, ds2, cd):
@@ -285,7 +442,10 @@ class Compiler:
     def cg_ld16_r16(self, dd, ds):
         if ds == dd:
             return
-        self.cg_op_pair("LD", "LD", dd, ds)
+        if dd != DD_A:
+            self.cg_op_pair("LD", "LD", dd, ds)
+        else:
+            self.asm(None, "LD", "A,{}".format(self.to_reg(ds)[1]))
 
     def cg_ld8_r8(self, rd, rs):
         self.asm(None, "LD", "{},{}".format(rd, rs))
@@ -342,6 +502,7 @@ class Compiler:
 
     def to_reg(self, dd):
         return {
+            DD_A:  'A',
             DD_BC: 'BC',
             DD_DE: 'DE',
             DD_HL: 'HL',

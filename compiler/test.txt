@@ -1,0 +1,24 @@
+; VDC Interface
+
+(int16 vdcBase vdcReg vdcData _vdcDataH _vdcDataL)
+
+(sub vdcWaitReady
+    (if (& 0x80 (input byte vdcBase)) (vdcWaitReady)))
+
+(sub vdcWriteByte
+    (vdcWaitReady)
+    (output byte vdcBase vdcReg)
+    (output byte (+ 1 vdcBase) vdcData))
+
+(sub vdcWriteAddress
+    (set _vdcDataH (/ vdcData 256))
+    (set _vdcDataL (& vdcData 0xFF))
+
+    (set vdcData _vdcDataH)
+    (set vdcReg (+ vdcReg 1))
+    (vdcWriteByte)
+
+    (set vdcData _vdcDataL)
+    (set vdcReg (+ vdcReg -1))
+    (vdcWriteByte))
+
