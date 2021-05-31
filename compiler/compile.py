@@ -110,6 +110,8 @@ class Compiler:
                 self.cg_set_var(node, dd, cd)
             elif node.car == 'if':
                 self.cg_if(node, dd, cd)
+            elif node.car == 'sub':
+                self.cg_sub(node, dd, CD_RET)
             else:
                 raise ValueError("Unsupported: {}".format(node.car))
         else:
@@ -128,8 +130,24 @@ class Compiler:
 
     def cg_statements(self, node, dd, cd):
         while node is not nil:
+            if node.cdr is not nil:
+                next_target = DD_HL
+                next_step = CD_NEXT
+            else:
+                next_target = dd
+                next_step = cd
             self.cg_form(node.car, next_target, next_step)
             node = node.cdr
+
+    def cg_sub(self, node, dd, cd):
+        # (sub NAME S1 S2 ...)
+        name = node.cdr.car
+        statements = node.cdr.cdr
+        if name in self.globals:
+            raise ValueError("Symbol already defined: {}".format(name))
+        self.globals.append(name)
+        self.cg_emit_label(name)
+        self.cg_statements(statements, dd, cd)
 
     def cg_if(self, node, dd, cd):
         # (if PRED CONSEQ ALTERopt)
