@@ -1,6 +1,7 @@
 ; VDC Interface
 
 (int16 vdcBase vdcReg vdcData _vdcDataH _vdcDataL)
+(int16 nBits)
 
 (sub vdcWaitReady
     (if (& 0x80 (input byte vdcBase)) (vdcWaitReady)))
@@ -11,7 +12,7 @@
     (output byte (+ 1 vdcBase) vdcData))
 
 (sub vdcWriteAddress
-    (set _vdcDataH (highbyte vdcData))
+    (set _vdcDataH (>> vdcData nBits))
     (set _vdcDataL (lowbyte vdcData))
 
     (set vdcData _vdcDataH)

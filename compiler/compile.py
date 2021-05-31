@@ -20,6 +20,7 @@ DD_DE = 2
 DD_HL = 3
 DD_TMP = 4
 DD_ZFLAG = 5
+DD_B = 6
 
 # Control Destinations
 # RET implies a return after the current expression or statement.
@@ -128,6 +129,10 @@ class Compiler:
                 self.cg_highbyte(node, dd, cd)
             elif node.car == 'lowbyte':
                 self.cg_lowbyte(node, dd, cd)
+            elif node.car == '>>':
+                self.cg_shift_right_logical(node, dd, cd)
+            elif node.car == '<<':
+                self.cg_shift_left(node, dd, cd)
             else:
                 if node.car not in self.globals:
                     raise ValueError("Unsupported: {}".format(node.car))
@@ -140,7 +145,7 @@ class Compiler:
             if starts_with_decimal_digit(node):
                 n = to_number(node)
 
-                if dd in [DD_A, DD_BC, DD_DE, DD_HL]:
+                if dd in [DD_A, DD_B, DD_BC, DD_DE, DD_HL]:
                     self.cg_ld16(dd, n)
                     self.cg_goto(cd)
                 else:
@@ -148,7 +153,7 @@ class Compiler:
             elif node[0] == '-':
                 n = -to_number(node[1:])
 
-                if dd in [DD_A, DD_BC, DD_DE, DD_HL]:
+                if dd in [DD_A, DD_B, DD_BC, DD_DE, DD_HL]:
                     self.cg_ld16(dd, n)
                     self.cg_goto(cd)
                 else:
@@ -159,6 +164,45 @@ class Compiler:
                     self.cg_goto(cd)
                 else:
                     raise ValueError("Symbol not declared: {}".format(node))
+
+    def cg_shift_right_logical(self, node, dd, cd):
+        # (>> EXPR COUNT)
+        e = node.cdr.car
+        cnt = node.cdr.cdr.car
+        
+        n_cnt = None
+        if starts_with_decimal_digit(cnt):
+            n_cnt = to_number(cnt)
+
+        def do_variable_shift():
+            loopback = self.make_label()
+            skipahead = None
+
+            self.cg_form(cnt, DD_B, CD_NEXT)
+            if n_cnt is None:
+                skipahead = self.make_label()
+                self.asm(None, "LD", "A,B")
+                self.asm(None, "OR", "A,A")
+                self.asm(None, "JZ", "L{}".format(skipahead))
+            self.asm(loopback, "SRL", "H")
+            self.asm(None, "RL", "L")
+            self.asm(None, "DJNZ", "L{}".format(loopback))
+            if n_cnt is None:
+                self.cg_emit_label(skipahead)
+
+        self.cg_form(e, DD_HL, CD_NEXT)
+        if n_cnt is None:
+            do_variable_shift()
+        elif n_cnt > 4:
+            do_variable_shift()
+        else: # 0 <= n_cnt <= 4:
+            for x in range(n_cnt):
+                self.asm(None, "SRL", "H")
+                self.asm(None, "RL", "L")
+        self.cg_goto(cd)
+
+    def cg_shift_left(self, node, dd, cd):
+        self.cg_goto(cd)
 
     def cg_highbyte(self, node, dd, cd):
         self.cg_form(node.cdr.car, DD_HL, CD_NEXT)
@@ -393,7 +437,11 @@ class Compiler:
         op(dd, DD_HL, DD_DE, cd)
 
     def cg_ld16_gv(self, dd, t):
-        self.asm(None, "LD", "{},({})".format(self.to_reg(dd), t))
+        if dd == DD_B:
+            self.cg_ld16_gv(DD_A, t)
+            self.asm(None, "LD", "B,A")
+        else:
+            self.asm(None, "LD", "{},({})".format(self.to_reg(dd), t))
 
     def cg_op16(self, dd, ds1, ds2, cd, op1, op2):
         self.asm(None, "LD", "A,{}".format(self.to_reg(ds1)[1]))
@@ -518,6 +566,7 @@ class Compiler:
     def to_reg(self, dd):
         return {
             DD_A:  'A',
+            DD_B:  'B',
             DD_BC: 'BC',
             DD_DE: 'DE',
             DD_HL: 'HL',
