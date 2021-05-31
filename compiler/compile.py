@@ -112,23 +112,34 @@ class Compiler:
                 self.cg_if(node, dd, cd)
             elif node.car == 'sub':
                 self.cg_sub(node, dd, CD_RET)
+            elif node.car == 'do':
+                self.cg_statements(node.cdr, dd, CD_RET)
             else:
-                raise ValueError("Unsupported: {}".format(node.car))
+                if node.car not in self.globals:
+                    raise ValueError("Unsupported: {}".format(node.car))
+                else:
+                    if node.cdr is not nil:
+                        raise ValueError("Arguments to subroutines not supported: {}".format(node.car))
+                    else:
+                        self.cg_call_libfn(node.car, cd)
         else:
             if starts_with_decimal_digit(node):
                 n = to_number(node)
 
                 if dd in [DD_BC, DD_DE, DD_HL]:
                     self.cg_ld16(dd, n)
+                    self.cg_goto(cd)
                 else:
                     raise ValueError("Unknown data destination: {}".format(dd))
             else:
                 if node in self.globals:
                     self.cg_ld16_gv(dd, node)
+                    self.cg_goto(cd)
                 else:
                     raise ValueError("Symbol not declared: {}".format(node))
 
     def cg_statements(self, node, dd, cd):
+        return_handled = False
         while node is not nil:
             if node.cdr is not nil:
                 next_target = DD_HL
@@ -136,8 +147,11 @@ class Compiler:
             else:
                 next_target = dd
                 next_step = cd
+                return_handled = True
             self.cg_form(node.car, next_target, next_step)
             node = node.cdr
+        if not return_handled:
+            self.cg_goto(cd)
 
     def cg_sub(self, node, dd, cd):
         # (sub NAME S1 S2 ...)
@@ -285,16 +299,16 @@ class Compiler:
                 if false_branch == CD_NEXT:
                     pass
                 elif false_branch == CD_RET:
-                    self.asm(None, "RET", "NZ")
+                    self.asm(None, "RET", "Z")
                 else:
-                    self.asm(None, "JP", "NZ,L{}".format(false_branch))
+                    self.asm(None, "JP", "Z,L{}".format(false_branch))
             elif true_branch == CD_RET:
                 if false_branch == CD_NEXT:
-                    self.asm(None, "RET", "Z")
+                    self.asm(None, "RET", "NZ")
                 elif false_branch == CD_RET:
                     self.cg_goto(CD_RET)
                 else:
-                    self.asm(None, "RET", "Z")
+                    self.asm(None, "RET", "NZ")
                     self.cg_goto(false_branch)
         elif cd == CD_NEXT:
             pass
@@ -335,5 +349,5 @@ class Compiler:
 
 
 if __name__ == '__main__':
-    Compiler().main(sys.argv[1])
+    Compiler().main(open(sys.argv[1]).read())
 
