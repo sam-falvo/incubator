@@ -124,6 +124,10 @@ class Compiler:
                 self.cg_output(node, dd, cd)
             elif node.car == 'input': # Intel/Z80 specific
                 self.cg_input(node, dd, cd)
+            elif node.car == 'highbyte':
+                self.cg_highbyte(node, dd, cd)
+            elif node.car == 'lowbyte':
+                self.cg_lowbyte(node, dd, cd)
             else:
                 if node.car not in self.globals:
                     raise ValueError("Unsupported: {}".format(node.car))
@@ -155,6 +159,17 @@ class Compiler:
                     self.cg_goto(cd)
                 else:
                     raise ValueError("Symbol not declared: {}".format(node))
+
+    def cg_highbyte(self, node, dd, cd):
+        self.cg_form(node.cdr.car, DD_HL, CD_NEXT)
+        self.asm(None, "LD", "L,H")
+        self.asm(None, "LD", "H,0")
+        self.cg_goto(cd)
+
+    def cg_lowbyte(self, node, dd, cd):
+        self.cg_form(node.cdr.car, DD_HL, CD_NEXT)
+        self.asm(None, "LD", "H,0")
+        self.cg_goto(cd)
 
     def cg_input(self, node, dd, cd):
         # (input SIZE ADDR)

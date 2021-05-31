@@ -11,8 +11,8 @@
     (output byte (+ 1 vdcBase) vdcData))
 
 (sub vdcWriteAddress
-    (set _vdcDataH (/ vdcData 256))
-    (set _vdcDataL (& vdcData 0xFF))
+    (set _vdcDataH (highbyte vdcData))
+    (set _vdcDataL (lowbyte vdcData))
 
     (set vdcData _vdcDataH)
     (set vdcReg (+ vdcReg 1))
