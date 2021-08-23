@@ -5,24 +5,24 @@
 \ Each word defined with primitives: could have been
 \ defined using extern: N N (for any name N) as well.
 
-primitives: drop dup over swap and zgo nzgo go
+xref: drop dup over swap and zgo nzgo go
 
 \ Some primitive names don't map to a corresponding name in
 \ the assembly language file.  Thus, they must be mangled
 \ or otherwise renamed.  So, for example, a reference to
 \ + would emit a JSR enter_plus instruction.
 
-extern: c@ cfetch
-extern: c! cstore
-extern: + plus
-extern: - minus
+xname: cfetch c@
+xname: cstore c!
+xname: plus +
+xname: minus -
 
 : 2drop		drop drop ;
 : 1-		1 - ;
 : 1+		1 + ;
 
 : emit		$FE20 c! ;
-: key?		$FE21 1 and ;
+: key?		$FE21 c@ 1 and ;
 
 : key		begin key? until $FE20 c@ ;
 
