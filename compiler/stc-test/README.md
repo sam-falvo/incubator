@@ -38,8 +38,10 @@ it would produce a corresponding assembly language file.
 Using the `ca65` assembler and corresponding linker,
 we can then produce a firmware or boot-disk image that the hardware can run.
 
-
 # The Details (5pp)
+
+
+    
 # Related Work (1-2pp)
 # Conclusion/Further Work (0.5-1.0pp)
 # References
