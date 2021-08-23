@@ -1,0 +1,38 @@
+E001
+
+     Internal error.  The compiler tried to place a string into a buffer,
+     but the buffer was too small.
+
+     Try increasing the value of the /Space constant in strings.fs.
+
+
+E002
+     Symbol already defined.  A program tried to declare a word as an external
+     label, but it's either already declared or has been defined by a previous
+     colon definition.
+
+     Remediation is to use another name, or change the name of the 
+     previously defined symbol.
+
+
+E003
+     Internal error.  The compiler tried to reference an interned string,
+     but the parameter was corrupted.
+
+     Remediation involves tracking down why the intern handle is corrupted.
+     Most likely cause is data stack imbalance.
+
+
+E004
+     Internal error.  The compiler tried to create a symbol binding between
+     an internal and an external name, but the table is full.
+
+     Remediation: Try increasing the value of #symbols in symtab.fs.
+
+
+E005
+     Symbol not defined.
+
+     Remediation: Make sure the symbol is defined or declared before
+     using it.
+
