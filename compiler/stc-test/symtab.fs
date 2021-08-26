@@ -83,6 +83,26 @@ variable xqofs
   match? if xqofs @ Values + @ Recall exit then
   -1 E005 ;
 
+
+: name ( -- caddr u )
+  32 parse ;
+
+: check ( caddr u -- caddr u )
+  dup 0= abort" E006: Symbol expected." ;
+
+
+\ Define a list of word names as xrefs; the list ends at
+\ the end of the line.  Note that comments are NOT recognized.
+: xref:
+  begin name dup if xref else 2drop exit then again ;
+
+
+\ Define a single xname.
+: xname:
+  name check name check xname ;
+
+
+
 marker passed
 
 : TestMatch?Undef

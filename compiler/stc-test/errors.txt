@@ -36,3 +36,10 @@ E005
      Remediation: Make sure the symbol is defined or declared before
      using it.
 
+
+E006
+     Symbol expected while defining an xname.  Either the internal
+     or the external symbol name is missing in an xname: construction.
+
+     Remediation: Use the proper syntax for the xname: construction.
+
