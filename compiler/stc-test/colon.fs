@@ -3,7 +3,7 @@
 
 : header ( caddr u -- )
   2dup xref
-  ." enter_" type ." :" cr ;
+  cr ." enter_" type ." :" cr ;
 
 : call ( caddr u -- )
   ."   jsr enter_" type cr ;
