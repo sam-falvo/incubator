@@ -84,13 +84,6 @@ variable xqofs
   -1 E005 ;
 
 
-: name ( -- caddr u )
-  32 parse ;
-
-: check ( caddr u -- caddr u )
-  dup 0= abort" E006: Symbol expected." ;
-
-
 \ Define a list of word names as xrefs; the list ends at
 \ the end of the line.  Note that comments are NOT recognized.
 : xref:

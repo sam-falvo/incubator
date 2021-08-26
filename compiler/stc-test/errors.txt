@@ -38,8 +38,15 @@ E005
 
 
 E006
-     Symbol expected while defining an xname.  Either the internal
-     or the external symbol name is missing in an xname: construction.
 
-     Remediation: Use the proper syntax for the xname: construction.
+     Symbol expected while defining an xname or colon definition.  This can be
+     caused by one of several causes:
+
+     1. Either the internal or the external symbol name is missing in an
+     xname: construction.
+
+     2. A colon definition is missing its required argument, the name of the
+     definition.
+
+     Remediation: Use the proper syntax for the construction in question.
 
