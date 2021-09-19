@@ -17,14 +17,14 @@ xname: cstore c!
 xname: plus +
 xname: minus -
 
-t: 2drop		drop drop ;
-t: 1-		1 - ;
-t: 1+		1 + ;
-t: emit		$FE20 c! ;
-t: key?		$FE21 c@ 1 and ;
-t: key		begin key? until $FE20 c@ ;
-t: cr		13 emit 10 emit ;
-t: type		begin dup while over c@ emit 1- swap 1+ swap repeat 2drop ;
-t: halt		begin key drop again ;
-t: hello-world   S" Hello world!" type cr halt ;
+tx: twodrop 2drop	drop drop ;
+tx: oneminus 1-		1 - ;
+tx: oneplus 1+		1 + ;
+t: emit			$FE20 c! ;
+tx: keyq key?		$FE21 c@ 1 and ;
+t: key			begin key? until $FE20 c@ ;
+t: cr			13 emit 10 emit ;
+t: type			begin dup while over c@ emit 1- swap 1+ swap repeat 2drop ;
+t: halt			begin key drop again ;
+tx: hw hello-world	S" Hello world!" type cr halt ;
 
