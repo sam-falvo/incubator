@@ -37,11 +37,19 @@ create template
   \ R> drops the return address for token.
   template find if nip nip r> drop execute else drop then ;
 
+: udec ( caddr u -- u t | f )
+  dup 0= if nip exit then
+  0 0 2over >number if drop 2drop 2drop 0 exit then
+  2drop nip nip -1 ;
+
+: uhex
+  base @ >r hex udec r> base ! ;
+
 \ Answers true if the string provided contains an unsigned number.
 \ The number is also returned underneath.  Answers only false otherwise.
 : unumber? ( caddr u -- u t | f )
-  0 0 2over >number if drop 2drop 2drop 0 exit then
-  2drop nip nip -1 ;
+  over c@ [char] $ = if 1 /string uhex exit then
+  udec ;
 
 \ Answers true if the string provided contains a signed number.
 \ The number is also returned underneath.  Answers only false otherwise.
