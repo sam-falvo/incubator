@@ -37,8 +37,27 @@ create template
   \ R> drops the return address for token.
   template find if nip nip r> drop execute else drop then ;
 
+\ Answers true if the string provided contains an unsigned number.
+\ The number is also returned underneath.  Answers only false otherwise.
+: unumber? ( caddr u -- u t | f )
+  0 0 2over >number if drop 2drop 2drop 0 exit then
+  2drop nip nip -1 ;
+
+\ Answers true if the string provided contains a signed number.
+\ The number is also returned underneath.  Answers only false otherwise.
+: snumber? ( caddr u -- n t | f )
+  over c@ [char] - = dup >r if 1 /string then
+  unumber? if r> if negate then -1 exit then
+  0 r> drop ;
+
+: ,lit ( n -- )
+  ."   jsr i_literal" cr ."   .word " . cr ;
+
+: -number ( caddr u -- caddr u )
+  2dup snumber? if ,lit 2drop r> drop then ;
+
 : token ( caddr u -- )
-  -compiler call ;
+  -compiler -number call ;
 
 : T] ( -- )
   begin lexeme dup if token then again ;
@@ -77,4 +96,6 @@ create template
 : cmp:then ;
 
 : cmp:S"   34 parse 2drop ;
+
+
 
