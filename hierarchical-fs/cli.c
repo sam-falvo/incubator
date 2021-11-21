@@ -28,6 +28,12 @@ readcl(char *buf, size_t len) {
 }
 
 
+static void
+do_pwd(void) {
+	write(STDOUT_FILENO, "/\n", 2);
+}
+
+
 static bool
 evalcl(char *buf, size_t len) {
 	bool exitrequested = false;
@@ -40,6 +46,7 @@ evalcl(char *buf, size_t len) {
 	args = buf + strlen(cmd) + 1;
 
 	if(!strcmp(buf, "exit")) exitrequested = true;
+	else if(!strcmp(buf, "pwd")) do_pwd();
 	else {
 		printf("%s: Command not supported\n  Args: %s\n", cmd, args);
 	}

@@ -1,0 +1,18 @@
+.TH PWD 0cmd
+
+.SH NAME
+
+pwd \- Prints the current working directory.
+
+.SH SYNOPSIS
+
+pwd
+
+.SH DESCRIPTION
+
+This command displays the current working directory.
+The displayed path will always be absolute.
+
+.SH SEE ALSO
+.BR cd (0cmd)
+
