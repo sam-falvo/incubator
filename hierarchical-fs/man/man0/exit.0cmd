@@ -1,0 +1,14 @@
+.TH EXIT 0cmd
+
+.SH NAME
+
+exit \- Terminates the explorer and returns you to your host shell.
+
+.SH SYNOPSIS
+
+exit
+
+.SH DESCRIPTION
+
+Exits the hierarchical file space explorer tool.
+
