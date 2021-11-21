@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#include "clifns.h"
+
 
 #define CMDBUF_LEN 256
 
@@ -20,8 +22,7 @@ readcl(char *buf, size_t len) {
 	write(STDOUT_FILENO, "^ ", 2);
 	actual = read(STDIN_FILENO, buf, len);
 	buf[len-1] = 0;
-	if(actual < len) buf[actual] = 0;
-
+	stripcmd(buf, actual);
 	return actual;
 }
 
