@@ -1,0 +1,18 @@
+.TH STRIPCMD 0subr
+
+.SH NAME
+
+stripcmd \- NUL-terminates command string at first ASCII control character.
+
+.SH SYNOPSIS
+
+#include "clifns.h"
+
+stripcmd(char *buffer, size_t length);
+
+.SH DESCRIPTION
+
+Every character in the buffer which is an ASCII control character is replaced with a NUL byte.
+Tabs (U+0009) are excluded, as they're considered whitespace (space as ASCII space, U+0020).
+The translation is destructive.
+
