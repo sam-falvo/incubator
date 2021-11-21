@@ -8,4 +8,6 @@ enable_testing()
 add_executable(cli-test "cli-test.c")
 add_test(cli-test cli-test)
 
+add_executable(t-stripcmp "t-stripcmd.c")
+add_test(t-stripcmd t-stripcmd)
 
