@@ -1,0 +1,29 @@
+.TH SKIPWS 0subr
+
+.SH NAME
+
+skipws \- Skip leading white space in a NUL-terminated string.
+
+.SH SYNOPSIS
+
+#include "clifns.h"
+
+skipws(char **str);
+
+.SH DESCRIPTION
+
+Skipws bumps the pointer str until it points at a byte which is not an ASCII whitespace character.
+The NUL character is not considered to be whitespace;
+therefore, if you attempt to skip whitespace on a string consisting only of whitespace characters,
+the result will be an empty string.
+
+.SH BUGS
+
+Passing in a string which is not properly NUL-terminated
+.I will
+result in a wild pointer.
+
+.SH SEE ALSO
+
+.IR stripcmd (0subr)
+

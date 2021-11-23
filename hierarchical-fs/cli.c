@@ -21,8 +21,8 @@ readcl(char *buf, size_t len) {
 	size_t actual;
 
 	write(STDOUT_FILENO, "^ ", 2);
-	actual = read(STDIN_FILENO, buf, len);
-	buf[len-1] = 0;
+	memset(buf, 0, len);
+	actual = read(STDIN_FILENO, buf, len-1);
 	stripcmd(buf, actual);
 	return actual;
 }
@@ -31,6 +31,13 @@ readcl(char *buf, size_t len) {
 static void
 do_pwd(void) {
 	write(STDOUT_FILENO, "/\n", 2);
+}
+
+
+static void
+do_cd(char *args) {
+	if(!strcmp(args, "/")) return;
+	printf("%s: path not found\n", args);
 }
 
 
@@ -44,11 +51,13 @@ evalcl(char *buf, size_t len) {
 
 	cmd = strtok_r(buf, delim, &saveptr);
 	args = buf + strlen(cmd) + 1;
+	skipws(&args);
 
 	if(!strcmp(buf, "exit")) exitrequested = true;
 	else if(!strcmp(buf, "pwd")) do_pwd();
+	else if(!strcmp(buf, "cd")) do_cd(args);
 	else {
-		printf("%s: Command not supported\n  Args: %s\n", cmd, args);
+		printf("%s: Command not supported\n", cmd);
 	}
 
 	return exitrequested;

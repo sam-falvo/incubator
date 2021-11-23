@@ -14,5 +14,5 @@ This command displays the current working directory.
 The displayed path will always be absolute.
 
 .SH SEE ALSO
-.BR cd (0cmd)
+.IR cd (0cmd)
 
