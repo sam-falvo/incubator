@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.18)
 
 add_library(
 	clilib STATIC
+	"do_cd.c"
+	"do_pwd.c"
 	"evalcl.c"
 	"skipws.c"
 	"stripcmd.c"

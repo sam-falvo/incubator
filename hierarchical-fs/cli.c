@@ -28,19 +28,6 @@ readcl(char *buf, size_t len) {
 }
 
 
-void
-do_pwd(char *args) {
-	write(STDOUT_FILENO, "/\n", 2);
-}
-
-
-void
-do_cd(char *args) {
-	if(!strcmp(args, "/")) return;
-	printf("%s: path not found\n", args);
-}
-
-
 int
 main(int argc, char *argv[]) {
 	bool done = false;
