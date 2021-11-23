@@ -1,0 +1,17 @@
+.TH CD 0cmd
+
+.SH NAME
+
+cd \- Changes the current directory.
+
+.SH SYNOPSIS
+
+cd path
+
+.SH DESCRIPTION
+
+This command alters the current working directory.
+
+.SH SEE ALSO
+.IR pwd (0cmd)
+
