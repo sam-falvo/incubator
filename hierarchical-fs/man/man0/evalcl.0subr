@@ -1,0 +1,35 @@
+.TH EVALCL 0subr
+
+.SH NAME
+
+evalcl \- Evaluate a command line.
+
+.SH SYNOPSIS
+
+#include "clifns.h"
+
+bool evalcl(char *cmd, size_t length);
+
+.SH DESCRIPTION
+
+Evaluate a NUL-terminated command line in the buffer cmd.
+The buffer must be at least length bytes long.
+
+.SH DIAGNOSTICS
+
+Generally, evalcl will respond with false under both normal and error circumstances.
+If the operator requested that the program be terminated,
+for example via the
+.B exit
+command,
+only then true will be returned.
+
+Errors which occur while processing a command will have their diagnostics printed to the console.
+
+.SH SEE ALSO
+
+.IR exit (0cmd),
+all
+.B do_*
+functions.
+

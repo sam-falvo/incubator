@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.18)
 
 add_library(
 	clilib STATIC
-	"stripcmd.c"
+	"evalcl.c"
 	"skipws.c"
+	"stripcmd.c"
 )
 
 add_executable(cli "cli.c")
