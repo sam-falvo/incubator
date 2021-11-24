@@ -13,23 +13,27 @@ int
 main(int argc, char *argv[]) {
 	static VEC vecs[] = {
 		// input                  expected
-		{ "//",                   "/",         },
-		{ "////",                 "/",         },
-		{ "./",                   ".",         },
-		{ "/.",                   "/",         },
-		{ "a/b/c",                "a/b/c",     },
-		{ "/a/b/c",               "/a/b/c",    },
-		{ "a/b/c/",               "a/b/c/",    },	// not minimal, but not bad either.
-		{ "/a/b/c/",              "/a/b/c/"    },	// not minimal, but not bad either.
-		{ "/dev/./cons",          "/dev/cons", },
-		{ ".",                    ".",         },
-		{ "..",                   ".",         },
-		{ "/..",                  "/",         },
-		{ "foo/bar/../baz",       "foo/baz",   },
-		{ "foo/bar/../../baz",    "baz",       },
-		{ "foo/bar/../../../baz", "baz",       },
-		{ "./../path",            "path",      },
-		{ "foo/./bar/./../baz",   "foo/baz",   },
+		{ "//",                   "/",             },
+		{ "////",                 "/",             },
+		{ "./",                   ".",             },
+		{ "/.",                   "/",             },
+		{ "a/b/c",                "a/b/c",         },
+		{ "/a/b/c",               "/a/b/c",        },
+		{ "a/b/c/",               "a/b/c",         },
+		{ "/a/b/c/",              "/a/b/c"         },
+		{ "/dev/./cons",          "/dev/cons",     },
+		{ ".",                    ".",             },
+		{ "..",                   ".",             },
+		{ "/..",                  "/",             },
+		{ "foo/bar/../baz",       "foo/baz",       },
+		{ "foo/bar/../../baz",    "baz",           },
+		{ "foo/bar/../../../baz", "baz",           },
+		{ "./../path",            "path",          },
+		{ "foo/./bar/./../baz",   "foo/baz",       },
+		{ "foo/./bar../baz",      "foo/bar../baz", },
+		{ "foo/./..bar/baz",      "foo/..bar/baz", },
+		{ "foo/./.../baz",        "foo/.../baz",   },
+		{ "foo/bar/baz/..",       "foo/bar",       },
 	};
 	char buffer[128];
 	char *pbuf;

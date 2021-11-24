@@ -25,20 +25,18 @@ The following transformations are applied:
 
 .IP // 4n
 Adjacent slashes are replaced with a single slash.
-
 .IP . 4n
 Single dot path elements are removed entirely,
 as they refer to the current directory at that point in the path name.
-
 .IP .. 4n
 Double dot path elements refer to the parent directory.
 Thus, not only are they removed, but so too is the preceding path element, if one exists.
-
 .PP
 If the resulting path output would be an empty string,
 the relative path ``.'' is returned instead.
 
 .SH EXAMPLE
+
 .EX
 // Converts relative path to absolute path and canonicalizes it.
 // Make absolutely sure output points to a large enough buffer.
