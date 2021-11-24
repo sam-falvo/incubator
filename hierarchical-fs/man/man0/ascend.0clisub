@@ -1,4 +1,4 @@
-.TH ASCEND 0subr
+.TH ASCEND 0clisub
 
 .SH NAME
 
@@ -29,7 +29,7 @@ This procedure works using C's negative array indices as a kind of "look-ahead" 
 Consider the following output paths, and how they are handled.  Note that I use the caret (``^'') to indicate where the output pointer sits.
 .IP foo/bar/^ 12n
 At this point, imagine that
-.IR canonicalize (0subr)
+.IR canonicalize (0clisub)
 has discovered the next path element is ``..''.
 To point op right at where bar/ sits,
 we must first consume the slash right behind the output pointer
@@ -54,5 +54,5 @@ This is an idempotent operation;
 no further processing need happen in this case.
 
 .SH SEE ALSO
-.IR canonicalize (0subr)
+.IR canonicalize (0clisub)
 

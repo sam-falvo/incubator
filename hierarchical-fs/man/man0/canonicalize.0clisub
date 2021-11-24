@@ -1,4 +1,4 @@
-.TH CANONICALIZE 0subr
+.TH CANONICALIZE 0clisub
 
 .SH NAME
 
@@ -54,5 +54,5 @@ make_absolute(char *input, char *output) {
 .EE
 
 .SH SEE ALSO
-.IR ascend (0subr)
+.IR ascend (0clisub)
 

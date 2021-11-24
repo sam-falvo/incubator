@@ -1,4 +1,4 @@
-.TH SKIPWS 0subr
+.TH SKIPWS 0clisub
 
 .SH NAME
 
@@ -25,5 +25,5 @@ result in a wild pointer.
 
 .SH SEE ALSO
 
-.IR stripcmd (0subr)
+.IR stripcmd (0clisub)
 
