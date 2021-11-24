@@ -1,0 +1,27 @@
+.TH ASCEND 0subr
+
+.SH NAME
+
+ascend \- Retract a path output pointer by one path element.
+
+.SH SYNOPSIS
+
+#include "clifns.h"
+
+ascend(char *path, char **pop);
+
+.SH DESCRIPTION
+
+The ascend procedure implements the semantics for the ``..'' path element during canonicalization.
+
+Canonicalization requires maintaining an output pointer somewhere within the path buffer.
+This procedure modifies that pointer so as to "walk up" the tree (hence, ascending the tree) by one path element, if possible.
+pop is a pointer to this output pointer.
+
+The resulting output pointer will always be less than or equal to the output pointer at the time this procedure was called.
+Most importantly, the output pointer will never appear ahead of the path buffer.
+Thus, for all input paths, the invariant path <= op(new) <= op(old) holds.
+
+.SH SEE ALSO
+.IR canonicalize (0subr)
+

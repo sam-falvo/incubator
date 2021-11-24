@@ -1,0 +1,60 @@
+.TH CANONICALIZE 0subr
+
+.SH NAME
+
+canonicalize \- Translates a path into a minimal yet equivalent form.
+
+.SH SYNOPSIS
+
+#include "clifns.h"
+
+canonicalize(char *path);
+
+.SH DESCRIPTION
+
+Canonicalize scans the path from left to right,
+looking for opportunities to reduce the path to an equivalent but shorter, more direct, form.
+This procedure works with relative and absolute path names alike.
+The result will not consider the current working directory.
+(In other words, this function will not convert a relative path to an equivalent absolute path.)
+It is the responsibility of the caller to perform the relative-to-absolute conversion if desired.
+This may be accomplished by prepending any relative paths with the current working directory and a slash.
+See EXAMPLE below.
+
+The following transformations are applied:
+
+.IP // 4n
+Adjacent slashes are replaced with a single slash.
+
+.IP . 4n
+Single dot path elements are removed entirely,
+as they refer to the current directory at that point in the path name.
+
+.IP .. 4n
+Double dot path elements refer to the parent directory.
+Thus, not only are they removed, but so too is the preceding path element, if one exists.
+
+.PP
+If the resulting path output would be an empty string,
+the relative path ``.'' is returned instead.
+
+.SH EXAMPLE
+.EX
+// Converts relative path to absolute path and canonicalizes it.
+// Make absolutely sure output points to a large enough buffer.
+// Assume currentdir is a global variable in the same compile unit.
+void
+make_absolute(char *input, char *output) {
+	output[0] = 0;
+	if(input[0] != '/') {
+		strcat(output, currentdir);
+		strcat(output, "/");
+	}
+	strcat(output, input);
+	canonicalize(output);
+}
+.EE
+
+.SH SEE ALSO
+.IR ascend (0subr)
+
