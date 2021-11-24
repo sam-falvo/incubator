@@ -22,6 +22,37 @@ The resulting output pointer will always be less than or equal to the output poi
 Most importantly, the output pointer will never appear ahead of the path buffer.
 Thus, for all input paths, the invariant path <= op(new) <= op(old) holds.
 
+.SH IMPLEMENTATION
+
+This procedure works using C's negative array indices as a kind of "look-ahead" to decide if it's safe to decrement the output pointer or to stop.
+
+Consider the following output paths, and how they are handled.  Note that I use the caret (``^'') to indicate where the output pointer sits.
+.IP foo/bar/^ 12n
+At this point, imagine that
+.IR canonicalize (0subr)
+has discovered the next path element is ``..''.
+To point op right at where bar/ sits,
+we must first consume the slash right behind the output pointer
+before commencing the loop that decrements it.
+.IP foo/bar^ 12n
+If, for some reason, we end up in a situation where we want to strip the last path element off of a filename through some other means,
+then we
+.I do not
+want to consume any characters first.
+We just start decrementing the output pointer until we reach the next slash.
+.IP foo/^ 12n
+With or without the slash, if we find ourselves in this situation, it is imperative that we not decrement the output pointer beyond the start of the path buffer.
+This is why the path buffer is passed as an argument:
+it is used for fenceposting.
+.IP /foo/^ 12n
+Similarly here, but we now have the additional caveat that we do
+.I not
+want to remove the leading slash indicating it is an absolute path.
+In this case, the fence is adjusted to just after the leading slash.
+.IP /^ 12n
+This is an idempotent operation;
+no further processing need happen in this case.
+
 .SH SEE ALSO
 .IR canonicalize (0subr)
 
