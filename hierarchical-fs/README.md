@@ -334,6 +334,109 @@ If this operation is successful, the kernel initializes the `fscursor` to an "op
 Otherwise, the `fscursor` remains in the closed state and is dereferenced, potentially causign it to be freed.
 An error is returned to the caller.
 
+## Life-Cycle Management
+
+Nodes can be created at any time.
+But, at some point, they must also be destroyed,
+or else the computer will run out of memory eventually.
+Each fsnode will need a reference count to properly keep track of how many items refer to it.
+
+An fsnode's children and sibling pointers are *weak* references; they do not contribute to a fsnode's reference count.
+Only the parent pointer, *if* it doesn't refer to itself, contributes towards a reference count.
+
+    struct fsnode {
+        char        *name;      // "/" for root directory.
+        fsqid       qid;        // 9P Qid fields.
+        uint32_t    mode;       // Permissions, file type, etc. flags.
+        uint32_t    atime;      // Accessed timestamp.
+        uint32_t    mtime;      // Modified timestamp.
+        uint64_t    length;     // length of the file, if appropriate.
+        char        *owner;     // owning user
+        char        *group;     // owning group
+        char        *muid;      // user who last modified the file.
+        fsnode      *parent;    // Root directory parent points to self.
+        fsnode      *sibling;   // Next fsnode in this directory.  NULL for root.
+        fsnode      *children;  // NULL for plain files or empty directories.
+        fsops       *ops;       // A set of file-specific methods.
+
+	uint32_t    nchildren;	// The number of fsnodes in the children list.
+	uint32_t    refcnt;	// Other kinds of reference counts (e.g., handles).
+    }
+
+In the structure above,
+I split the reference count into two parts:
+
+* nchildren refers to the number of nodes in the children list.  Since each of these nodes must have its parent pointer set to its container, this field effectively counts how many children exist.
+* refcnt refers to other kinds of handles, such as file handles opened by an application, mount table entries, etc.
+
+The fsnode is safe for disposal if and only if both nchildren and refcnt are both zero.
+
+Since applications will maintain references to leaves of the fsnode tree, a leaf node's refcnt will be greater than zero for the duration of the file handle's existence.
+Transitively, any parent node references it maintains will be accounted for through the nchildren fields of all linked parent nodes.
+This stops at the root of the tree.
+If the tree is mounted onto another tree, then
+the corresponding mount entry in the fsmounttable will have a strong reference to the mount point, itself a leaf of another tree.
+And, so, the reference chain can be transitively maintained back to *it's* root, and so on.
+
+A mount record will also maintain a strong reference to the root directory of the mounted tree as well.
+Therefore, even if all its children get deallocated, the root will remain as long as the mount point remains.
+
+For this reason, the directory structure maintained by the fsnode hierarchy is best described as a record of all the *live* directory elements;
+that is, all the directory nodes which are in active use by someone at the moment.
+The structure will be expected to grow and shrink dynamically as program needs dictate.
+
+In order to give the fsnode tree a chance to grow,
+we need to provide hooks the `fs_find_first` and `fs_find_next` functions
+to allow them the chance to, e.g., read in a directory structure from disk.
+
+    struct fsops {
+        int (*flush)(fscursor *);
+        int (*open)(fscursor *, uint8_t mode);
+        int (*create)(fscursor *, char *name, uint32_t permissions, uint8_t mode);
+        void (*close)(fscursor *);
+        int (*read)(fscursor *, uint64_t offset, uint8_t *buf, uint32_t length, uint32_t *actual);
+        int (*write)(fscursor *, uint64_t offset, uint8_t *buf, uint32_t length, uint32_t *actual);
+        int (*remove)(fscursor *);
+        int (*stat)(fscursor *, uint8_t *statbuf, uint32_t maxlen);
+        int (*wstat)(fscursor *, uint8_t *statbuf);
+
+	int (*find_first)(fscursor *, fsnode *);
+	int (*find_next)(fscursor *);
+    };
+
+    fsnode *
+    fs_find_first(fscursor *c, fsnode *n) {
+        fsnode *mountroot = get_mount_point(n);
+
+        if(mountroot != NULL) c->current = mountroot;
+        c->sibling = n->children;
+	if(!c->sibling) {
+		int error = n->ops->find_first(c, n);
+		// Somehow handle error here if possible.
+	}
+        return c->sibling;
+    }
+
+    fsnode *
+    fs_find_next(fscursor *c) {
+        if(c->sibling) c->sibling = c->sibling->next;
+	// Just because there's nothing left in memory, it doesn't mean
+	// there's nothing left on-disk.  Try to read the rest of the directory
+	// from storage.
+	if(!c->sibling) {
+		int error = n->ops->find_next(c);
+		// Somehow handle error here if possible.
+	}
+        return c->sibling;
+    }
+
+Note: As presented here, the `find_first` and `find_next` hooks would be expected to manipulate the fsnode and/or fscursor structures directly.
+
+Observation: You have a choice!  You could use the `fsnode.children` field to maintain a cache of directory entries, or you can just set it to NULL and never think about it again.
+In the latter case, `fs_find_first` will immediately defer to `n->ops->find_first()`, which would update the cursor's `c->sibling` field with an fsnode structure
+that only has its parent field set appropriately.
+When `fs_find_next` is invoked on the cursor, the lack of a sibling will cause `n->ops->find_next()` to be invoked,
+in which case you could reuse the fsnode structure (assuming its reference counts indicate it's safe to do!) for the next directory entry.
 
 # Related Work (1-2pp)
 
