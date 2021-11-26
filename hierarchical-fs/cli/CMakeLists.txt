@@ -10,7 +10,7 @@ add_library(
 )
 
 add_executable(cli "cli.c")
-target_link_libraries(cli clilib)
+target_link_libraries(cli clilib dmlib)
 
 add_executable(t-stripcmd "t-stripcmd.c")
 target_link_libraries(t-stripcmd clilib)

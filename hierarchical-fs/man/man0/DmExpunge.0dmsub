@@ -1,0 +1,21 @@
+.TH DMEXPUNGE 0dmsub
+.SH NAME
+
+DmExpunge \- Expunge a process' anchor block
+
+.SH SYNOPSIS
+
+#include "dmfns.h"
+
+void DmExpunge(DmAnchorBlock *ab);
+
+.SH DESCRIPTION
+Cleans up the process' anchor block.
+This must be the last directory manager function called by a process.
+
+This anchor block must be created with
+.IR DmInitialize (0dmsub).
+
+.SH SEE ALSO
+.IR DmInitialize (0dmsub)
+

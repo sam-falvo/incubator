@@ -1,0 +1,28 @@
+.TH DMCURRENTDIR 0dmsub
+.SH NAME
+
+DmCurrentDir \- Retrieve the process' current working directory
+
+.SH SYNOPSIS
+
+#include "dmfns.h"
+
+int DmCurrentDir(DmAnchorBlock *ab, char *path, int len);
+
+.SH DESCRIPTION
+
+Attempt to retrieve the current working directory of the running process.
+The path will always start with a slash (``/''), as it will always be absolute.
+The path will be copied into the buffer pointed to by path,
+which must be at least len bytes in length.
+
+.SH DIAGNOSTICS
+
+E_TOOSMALL is returned if the provided path buffer is too small to hold the current path.
+
+E_OK is returned otherwise.
+
+.SH SEE ALSO
+.IR DmInitialize (0dmsub),
+.IR DmChangeDir (0dmsub)
+

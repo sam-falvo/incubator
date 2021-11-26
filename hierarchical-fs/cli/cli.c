@@ -6,6 +6,8 @@
 
 #include "clifns.h"
 
+#include "dm.h"
+
 
 #define CMDBUF_LEN 256
 
@@ -33,13 +35,22 @@ main(int argc, char *argv[]) {
 	bool done = false;
 	static char cmdbuffer[CMDBUF_LEN];
 	size_t length;
+	DmAnchorBlock *ab;
+
+	ab = DmInitialize();
+	if(!ab) {
+		fprintf(stderr, "DmInitialize() failed: out of memory\n");
+		return 127;
+	}
 
 	banner();
 	while(!done) {
 		length = readcl(cmdbuffer, CMDBUF_LEN);
-		done = evalcl(cmdbuffer, length);
+		done = evalcl(ab, cmdbuffer, length);
 		// Printing happens as a consequence of executing commands.
 	}
+
+	DmExpunge(ab);
 
 	return 0;
 }

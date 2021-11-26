@@ -1,0 +1,31 @@
+.TH DMCHANGEDIR 0dmsub
+.SH NAME
+
+DmChangeDir \- Change a process' current directory
+
+.SH SYNOPSIS
+
+#include "dmfns.h"
+
+int DmChangeDir(DmAnchorBlock *ab, char *path);
+
+.SH DESCRIPTION
+
+Attempt to change the current working directory of the running process.
+If path starts with a slash (``/''),
+it is assumed to be an absolute path.
+Otherwise, it is considered to be a relative path,
+and will first be qualified by the current working directory.
+
+The equivalent absolute path must already exist.
+
+.SH DIAGNOSTICS
+
+ENOTIMPL is returned in the debug builds if some functionality isn't yet implemented.
+
+ENOTEXIST is returned if the path does not exist.
+
+.SH SEE ALSO
+.IR DmInitialize (0dmsub),
+.IR DmCurrentDir (0dmsub)
+

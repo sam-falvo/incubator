@@ -1,0 +1,26 @@
+.TH DMINITIALIZE 0dmsub
+.SH NAME
+
+DmInitialize \- Initialize a process' anchor block
+
+.SH SYNOPSIS
+
+#include "dmfns.h"
+
+DmAnchorBlock *DmInitialize();
+
+.SH DESCRIPTION
+Initializes an anchor block for the process.
+This must be the first directory manager function called by a process.
+
+This anchor block must be disposed of with
+.IR DmExpunge (0dmsub)
+prior to the process terminating.
+
+.SH DIAGNOSTICS
+
+NULL is returned if there is insufficient memory for a new anchor block.
+
+.SH SEE ALSO
+.IR DmExpunge (0dmsub)
+

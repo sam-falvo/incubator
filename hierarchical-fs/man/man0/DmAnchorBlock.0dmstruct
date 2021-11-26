@@ -1,0 +1,27 @@
+.TH DMANCHORBLOCK 0dmstruct
+
+.SH NAME
+
+DmAnchorBlock \- Process Data for Directory Manager
+
+.SH SYNOPSIS
+
+.EX
+#include "dm/structs.h"
+
+struct DmAnchorBlock {
+        int     curdirlen;
+        char    *curdir;
+};
+.EE
+
+.SH DESCRIPTION
+The DmAnchorBlock structure contains directory manager fields that are relevant to a process.
+The first thing a process must do before using the directory manager is acquire an instance of this structure.
+With rare exception, all process-level functions will require a DmAnchorBlock instance.
+
+Curdir points to a buffer containing the process' current working directory as a NUL-terminated string.
+This buffer must be at least curdirlen bytes long.
+Note that the length of the string may be less than curdirlen, but can never equal or exceed it.
+The directory manager will grow this buffer as needed.
+
