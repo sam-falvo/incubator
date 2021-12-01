@@ -50,7 +50,7 @@
 \ below codepoint $21 to be whitespace.  Thus, tabs, newlines,
 \ spaces, carriage returns, etc. are all considered whitespace.
 : name ( -- caddr u )
-  ws pt -ws pt over - ;
+  ws pt -ws pt eat over - ;
 
 \ Check to make sure that a name actually exists.
 \ If not, abort with an error.

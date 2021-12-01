@@ -6,6 +6,7 @@
 \ defined using extern: N N (for any name N) as well.
 
 xref: drop dup over swap and zgo nzgo go
+xref: or
 
 \ Some primitive names don't map to a corresponding name in
 \ the assembly language file.  Thus, they must be mangled
@@ -16,15 +17,28 @@ xname: cfetch c@
 xname: cstore c!
 xname: plus +
 xname: minus -
+xname: equal =
 
-tx: twodrop 2drop	drop drop ;
-tx: oneminus 1-		1 - ;
-tx: oneplus 1+		1 + ;
-t: emit			$FE20 c! ;
-tx: keyq key?		$FE21 c@ 1 and ;
-t: key			begin key? until $FE20 c@ ;
-t: cr			13 emit 10 emit ;
-t: type			begin dup while over c@ emit 1- swap 1+ swap repeat 2drop ;
-t: halt			begin key drop again ;
-tx: hw hello-world	S" Hello world!" type cr halt ;
+tx: twodrop 2drop       drop drop ;
+tx: oneminus 1-         1 - ;
+tx: oneplus 1+          1 + ;
+t: emit                 $FE20 c! ;
+tx: keyq key?           $FE21 c@ 1 and ;
+t: key                  begin key? until $FE20 c@ ;
+t: cr                   13 emit 10 emit ;
+t: type                 begin dup while over c@ emit 1- swap 1+ swap repeat 2drop ;
+t: halt                 begin key drop again ;
+t: wait
+  begin
+    key dup 'Q = swap 'q = or if
+      S" Trying to quit..." type cr exit
+    else
+      S" Invalid key.  Try q or Q." type cr
+    then
+  again ;
+
+tx: hw hello-world
+  S" Hello world!" type cr
+  wait
+  S" You can't quit." type cr halt ;
 

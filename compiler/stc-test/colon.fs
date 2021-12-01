@@ -48,6 +48,7 @@ create template
 \ Answers true if the string provided contains an unsigned number.
 \ The number is also returned underneath.  Answers only false otherwise.
 : unumber? ( caddr u -- u t | f )
+  over c@ [char] ' = if 1 /string drop c@ -1 exit then
   over c@ [char] $ = if 1 /string uhex exit then
   udec ;
 
@@ -94,16 +95,32 @@ create template
 
 
 
-: cmp:begin ;
-: cmp:again ;
-: cmp:until ;
-: cmp:repeat ;
-: cmp:while ;
-: cmp:if ;
-: cmp:else ;
-: cmp:then ;
+\ Control Flow Constructs
 
-: cmp:S"   34 parse 2drop ;
+variable label#
+0 label# !
+
+: >z                  ."   inx" cr ."   inx" cr ."   lda 0,x" cr ;
+: label ( - n )       label# @ dup 1+ label# ! ;
+: .label ( n - )      ." L" s>d <# #s #> type ;
+: designate ( - n )   label dup .label ." :" cr ;
+: goto ( n - )        ."   jmp " .label cr ;
+
+: cmp:if              label >z ."   beq " dup .label cr ;
+: cmp:then            .label ." :" cr ;
+: cmp:else            ."   jmp " label dup .label cr swap cmp:then ;
+: cmp:begin           designate ;
+: cmp:again           goto ;
+: cmp:until           >z  ."   beq " .label cr ;
+: cmp:while           cmp:if swap ;
+: cmp:repeat          goto cmp:then ;
+
+: cmp:S"
+  34 parse
+  ."   jsr i_string" cr
+  ."   .word " dup . cr
+  ."   .byte " 34 emit type 34 emit cr ;
+
 
 
 
