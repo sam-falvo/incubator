@@ -1,0 +1,94 @@
+.TH DMNODE 0dmstruct
+
+.SH NAME
+
+DmNode \- A single named entry in the directory tree
+
+.SH SYNOPSIS
+
+.EX
+#include "dm.h"
+
+struct DmNode {
+	char        *name;
+	DmQid       qid;
+	uint32_t    mode;
+	uint32_t    atime;
+	uint32_t    mtime;
+	uint64_t    length;
+	char        *owner;
+	char        *group;
+	char        *muid;
+	DmNode      *parent;
+	DmNode      *sibling;
+	DmNode      *children;
+	fsops       *ops;
+	uint32_t    nchildren;
+	uint32_t    refcnt;
+};
+.EE
+
+.SH DESCRIPTION
+DmNode structures represent individual nodes in the directory tree.
+With the exception for the root directory node itself,
+each node must have a name which cannot have a slash in it.
+The root node is the only node whose name is defined to be ``/''.
+
+The qid, mode, atime, mtime, length, owner, group, and muid fields
+all correspond to their eponymously named fields in the 9P stat structure.
+See Plan 9's intro(5) for more details on how the qid and mode fiels are used.
+
+The parent, sibling, and children fields are used to maintain the tree structure,
+and to help support root-to-leaf navigation.
+.IP parent 10n
+This field points to the containing directory entry.
+The root directory has no container by definition;
+in this case, the root's parent field points to the root DmNode itself.
+This field must never be NULL.
+.IP sibling 10n
+This field points to the next directory entry in a chain of entries all contained in the same parent.
+If this field is NULL, no further siblings remain in the chain.
+.IP children 10n
+This field is significant only for DmNodes representing directories
+(qid.type & QTDIR != 0).
+It points to a singly-linked list of DmNode structures,
+each of which representing a directory entry contained within this one.
+.B All
+of the contained children must set their parent field to refer to this DmNode.
+NULL indicates no children exist; e.g., an empty directory.
+DmNodes which are not representing directories must keep this field NULL.
+.PP
+The ops field points to a DmOps structure,
+which is filled out with handlers
+for various operations
+that an application might want to perform
+on this directory entry.
+
+Nchildren and refcnt are both reference counts.
+.IP nchildren 10n
+If this DmNode is a parent directory, this field counts how many children are accessible via the children list.
+Otherwise, this field must be set to zero.
+Applications
+.B "must not"
+use this field to count the length of the list precisely; treat it as an estimate only if you must.
+It's only purpose is to prevent destruction of the parent DmNode
+while one or more children still exist.
+Therefore, it is always safe
+for this count to be greater than the actual list length;
+but, programmer beware if the count ever falls below the list length.
+.IP refcnt 10n
+This field counts other kinds of references to this structure.
+These references can come from a variety of sources,
+such as mount table entries,
+or simply making copies of pointers for passing as arguments.
+.PP
+The DmNode may be disposed of if, and only if,
+the sum of nchildren and refcnt equals zero.
+
+.SH SEE ALSO
+.IR DmQid (0dmstruct),
+.IR DmOps (0dmstruct),
+the Plan 9 man pages,
+.IR intro "(5) and"
+.IR stat (5).
+
