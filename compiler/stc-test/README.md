@@ -1,4 +1,6 @@
-**This project and its README are works in progress.**
+**This project has been archived.
+The latest version of this project has been promoted out of incubation,
+and is now accessible via the [Shoehorn repository](https://git.sr.ht/~vertigo/shoehorn).**
 
 # Abstract
 # Introduction
