@@ -1,7 +1,10 @@
 extern crate stencil;
 extern crate sdlstate;
 
-use stencil::{Stencil, Unit, Dimension};
+use stencil::stencil::Stencil;
+use stencil::types::{Unit, Dimension};
+use stencil::typesetter::{SYSTEM_BITMAP_FONT, Typesetter};
+
 use sdlstate::SdlState;
 use std::{thread, time};
 
@@ -45,6 +48,9 @@ fn main() {
             desktop.filled_rectangle((0, 0), (W, H), &DESKTOP_PATTERN);
 
             draw_dialog_box(&mut desktop, 80, 50, 240, 150);
+
+            let mut t = Typesetter::new(&SYSTEM_BITMAP_FONT, 82, 51 + SYSTEM_BITMAP_FONT.baseline, 238, 149);
+            t.place_text("Hello clock!");
 
             sdl.paint_with(|ctx| {
                 ctx.paste_stamp_be((0, 0), (W as usize, H as usize), desktop.get_span(), (0, 0), desktop.borrow_bits());
