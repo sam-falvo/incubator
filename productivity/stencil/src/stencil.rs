@@ -51,10 +51,10 @@ use crate::types::{Unit, Point, Dimension};
 /// A Stencil encapsulates a bitmapped image.
 pub struct Stencil {
     /// (Width, Height) of the stencil, in dots.
-    dimensions: (Dimension, Dimension),
+    pub dimensions: (Dimension, Dimension),
 
     /// The storage for the raw bits of the stencil.
-    bits: Vec<u8>,
+    pub bits: Vec<u8>,
 }
 
 static LEFT_MASKS: [u8; 8] = [ 0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, ];

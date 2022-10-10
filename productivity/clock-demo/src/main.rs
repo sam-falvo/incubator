@@ -46,11 +46,17 @@ fn main() {
         Some(mut desktop) => {
             desktop.filled_rectangle((0, 0), (W, H), &DESKTOP_PATTERN);
 
-            draw_dialog_box(&mut desktop, 80, 50, 240, 150);
+            for i in 0..65536 {
+                draw_dialog_box(&mut desktop, 80, 50, 240, 150);
 
-            sdl.paint_with(|ctx| {
-                ctx.paste_stamp_be((0, 0), (W as usize, H as usize), desktop.get_span(), (0, 0), desktop.borrow_bits());
-            });
+                demo(&mut desktop, i);
+
+                sdl.paint_with(|ctx| {
+                    ctx.paste_stamp_be((0, 0), (W as usize, H as usize), desktop.get_span(), (0, 0), desktop.borrow_bits());
+                });
+
+                thread::sleep(time::Duration::new(1, 16));
+            }
 
             thread::sleep(time::Duration::new(15, 0));
         },
@@ -61,3 +67,131 @@ fn main() {
     };
 
 }
+
+use crate::stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+
+struct BlitContext<'a> {
+    src_bits: &'a [u8],
+    src_ptr: usize,
+    src_data: u8,
+    src_shift: u8,
+
+    dst_bits: &'a mut [u8],
+    dst_ptr: usize,
+
+    operation: BlitOp,
+}
+
+// 0bABCD
+//   ||||
+//   |||`-- !D & !S
+//   ||`--- !D &  S
+//   |`----  D & !S
+//   `-----  D &  S
+#[repr(usize)]
+enum BlitOp {
+    Black,
+    Nor,
+    NotDandS,
+    NotD,
+    DandNotS,
+    NotS,
+    Xor,
+    Nand,
+    And,
+    Xnor,
+    S,
+    SorNotD,
+    D,
+    DorNotS,
+    Or,
+    White,
+}
+
+fn demo(desktop: &mut Stencil, frame: usize) {
+    let font = SYSTEM_BITMAP_FONT;
+    let mut bc = BlitContext {
+        src_bits: font.bits,
+        src_ptr: 0,
+        src_data: 0,
+        src_shift: (frame & 7) as u8,
+
+        dst_bits: &mut desktop.bits,
+        dst_ptr: 4016 + 720,
+
+        operation: BlitOp::DandNotS,
+    };
+
+    for i in 0..9 {
+        bc.src_data = 0;
+        blit_byte_ascending(&mut bc);
+        blit_byte_ascending(&mut bc);
+        blit_byte_ascending(&mut bc);
+        blit_byte_ascending(&mut bc);
+        blit_byte_ascending(&mut bc);
+
+        bc.src_ptr = bc.src_ptr.overflowing_add(60-5).0;
+        bc.dst_ptr = bc.dst_ptr.overflowing_add(40-5).0;
+    }
+}
+
+fn blit_byte_ascending(bc: &mut BlitContext) {
+    let raw_s = bc.src_bits[bc.src_ptr];
+    let s = ((raw_s as u16 >> bc.src_shift) | ((bc.src_data as u16) << (8 - bc.src_shift))) as u8;
+    let d = bc.dst_bits[bc.dst_ptr];
+
+    let d = match bc.operation {
+        BlitOp::Black => 0u8,
+        BlitOp::Nor => !(s | d),
+        BlitOp::NotDandS => !d & s,
+        BlitOp::NotD => !d,
+        BlitOp::DandNotS => d & !s,
+        BlitOp::NotS => !s,
+        BlitOp::Xor => s ^ d,
+        BlitOp::Nand => !(s & d),
+        BlitOp::And => s & d,
+        BlitOp::Xnor => !(s | d),
+        BlitOp::S => s,
+        BlitOp::SorNotD => s | !d,
+        BlitOp::D => d,
+        BlitOp::DorNotS => d | !s,
+        BlitOp::Or => s | d,
+        BlitOp::White => 0xFFu8,
+    };
+
+    bc.dst_bits[bc.dst_ptr] = d;
+    bc.dst_ptr = bc.dst_ptr.overflowing_add(1).0;
+    bc.src_ptr = bc.src_ptr.overflowing_add(1).0;
+    bc.src_data = raw_s;
+}
+
+fn blit_byte_descending(bc: &mut BlitContext) {
+    let raw_s = bc.src_bits[bc.src_ptr];
+    let s = (((raw_s as u16) << bc.src_shift) | ((bc.src_data as u16) >> (8 - bc.src_shift))) as u8;
+    let d = bc.dst_bits[bc.dst_ptr];
+
+    let d = match bc.operation {
+        BlitOp::Black => 0u8,
+        BlitOp::Nor => !(s | d),
+        BlitOp::NotDandS => !d & s,
+        BlitOp::NotD => !d,
+        BlitOp::DandNotS => d & !s,
+        BlitOp::NotS => !s,
+        BlitOp::Xor => s ^ d,
+        BlitOp::Nand => !(s & d),
+        BlitOp::And => s & d,
+        BlitOp::Xnor => !(s | d),
+        BlitOp::S => s,
+        BlitOp::SorNotD => s | !d,
+        BlitOp::D => d,
+        BlitOp::DorNotS => d | !s,
+        BlitOp::Or => s | d,
+        BlitOp::White => 0xFFu8,
+    };
+
+    bc.dst_bits[bc.dst_ptr] = d;
+    bc.dst_ptr = bc.dst_ptr.overflowing_sub(1).0;
+    bc.src_ptr = bc.src_ptr.overflowing_sub(1).0;
+    bc.src_data = raw_s;
+}
+
