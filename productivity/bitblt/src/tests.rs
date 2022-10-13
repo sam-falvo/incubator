@@ -1,6 +1,10 @@
 use crate::{BlitOp, BlitContext};
 use crate::{blit_byte_ascending, blit_byte_descending};
 
+// Given that you have a properly initialized BlitContext structure,
+// when you call blit_byte_ascending,
+// then a single byte should be transferred, leaving the BlitContext in a state where subsequent
+// calls to blit_byte_ascending will seamlessly continue the blit operation.
 #[test]
 fn blit_byte_ascending_tracks_source_bytes() {
     let src: [u8; 1] = [0x21];
@@ -27,6 +31,10 @@ fn blit_byte_ascending_tracks_source_bytes() {
     assert_eq!(bc.d_ptr, 1);
 }
 
+// Given that you have a properly initialized BlitContext structure,
+// when you call blit_byte_descending,
+// then a single byte should be transferred, leaving the BlitContext in a state where subsequent
+// calls to blit_byte_descending will seamlessly continue the blit operation.
 #[test]
 fn blit_byte_descending_tracks_source_bytes() {
     let src: [u8; 1] = [0x21];
