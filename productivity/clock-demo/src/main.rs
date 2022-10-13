@@ -72,7 +72,7 @@ fn main() {
                     );
                 });
 
-                thread::sleep(time::Duration::new(0, 100000000));
+                thread::sleep(time::Duration::new(0, 50000000));
             }
         }
 
