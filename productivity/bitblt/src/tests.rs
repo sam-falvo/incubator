@@ -240,6 +240,18 @@ mod rectangle_level {
         assert_eq!(bc.d_bits, [0b00100110, 0b00000000]);
     }
 
+    // While debugging issues with blit_rect_from_shifted_source_to_destination_backwards above,
+    // I needed to inspect and confirm certain BlitContext values.  I refactored the code to grant
+    // me access to the state of a BlitContext just before the blit_rect actually commences.
+    //
+    // This unit test somewhat exposes an internal design decision; thus, if this test starts
+    // failing as a result of future maintenance, it is explicitly a candidate for replacement with
+    // a more modern test, or removal all-together.
+    //
+    // Given a source rectangle that isn't byte-aligned,
+    // when we call blit_rect() with a certain set of arguments
+    // then we expect to see first and last column masks correctly assigned, and correct source and
+    // destination pointers.
     #[test]
     fn prepare_blit_rect_from_shifted_source_to_destination_backwards() {
         let src: [u8; 2] = [0x13, 0x55];
@@ -253,5 +265,147 @@ mod rectangle_level {
         assert_eq!(bc.s_lc_mask, 0x7F);
     }
 
+    // Illustrate how to draw a MacOS-style mouse pointer on a desktop background.
+    #[test]
+    fn blit_mouse_cursor() {
+        // Let's start with a 50% grey stippled background, just like classic MacOS or GEOS.
+        let mut hypothetical_desktop: [u8; 128] = [
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+        ];
+
+        // Now, let's draw the mouse's white outline.
+        //
+        // Although the mouse is only 16x16, we still define a spare byte column on the right to
+        // facilitate support for shifted blits.  Otherwise, blitting will result in slice
+        // bounds-check issues when blitting into destination rectangles that are 3-bytes wide.
+        let mouse_mask: [u8; 48] = [
+            0b11000000, 0b00000000, 0b00000000,
+            0b11110000, 0b00000000, 0b00000000,
+            0b01111100, 0b00000000, 0b00000000,
+            0b01111111, 0b00000000, 0b00000000,
+            0b00111111, 0b11000000, 0b00000000,
+            0b00111111, 0b11100000, 0b00000000,
+            0b00011111, 0b11000000, 0b00000000,
+            0b00011111, 0b11000000, 0b00000000,
+            0b00001111, 0b11100000, 0b00000000,
+            0b00001111, 0b11110000, 0b00000000,
+            0b00000100, 0b11111000, 0b00000000,
+            0b00000000, 0b01111000, 0b00000000,
+            0b00000000, 0b00110000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+        ];
+
+        let mut bc = BlitContext::new(&mouse_mask, 3, &mut hypothetical_desktop, 4);
+        blit_rect(&mut bc, 0, 0, 16, 16, 10, 10, BlitOp::Or);
+
+        // Next, we draw the body of the mouse.
+        let mouse_mask: [u8; 48] = [
+            0b00000000, 0b00000000, 0b00000000,
+            0b01000000, 0b00000000, 0b00000000,
+            0b00110000, 0b00000000, 0b00000000,
+            0b00111100, 0b00000000, 0b00000000,
+            0b00011111, 0b00000000, 0b00000000,
+            0b00011111, 0b11000000, 0b00000000,
+            0b00001111, 0b00000000, 0b00000000,
+            0b00001111, 0b10000000, 0b00000000,
+            0b00000101, 0b11000000, 0b00000000,
+            0b00000100, 0b11100000, 0b00000000,
+            0b00000000, 0b01110000, 0b00000000,
+            0b00000000, 0b00110000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+            0b00000000, 0b00000000, 0b00000000,
+        ];
+
+        bc.s_bits = &mouse_mask;
+        blit_rect(&mut bc, 0, 0, 16, 16, 10, 10, BlitOp::DandNotS);
+
+        // The resulting desktop should look like the mouse pointer is somewhere in the center of
+        // the 32x32 pixel matrix.
+        let expected_desktop: [u8; 128] = [
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10111010, 0b10101010, 0b10101010,
+            0b01010101, 0b01101101, 0b01010101, 0b01010101,
+            0b10101010, 0b10110011, 0b10101010, 0b10101010,
+            0b01010101, 0b01010000, 0b11010101, 0b01010101,
+            0b10101010, 0b10101000, 0b00111010, 0b10101010,
+            0b01010101, 0b01011000, 0b00001101, 0b01010101,
+            0b10101010, 0b10101100, 0b00111010, 0b10101010,
+            0b01010101, 0b01010100, 0b00010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10001010, 0b10101010,
+            0b01010101, 0b01010110, 0b11000101, 0b01010101,
+            0b10101010, 0b10101011, 0b10100010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010011, 0b01010101,
+            0b10101010, 0b10101010, 0b10101110, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+            0b10101010, 0b10101010, 0b10101010, 0b10101010,
+            0b01010101, 0b01010101, 0b01010101, 0b01010101,
+        ];
+
+        // For pretty-printing purposes, let's dump the XOR between the hypothetical and expected
+        // desktop patterns.  This should be a 32x32 matrix of dots (.) if all is well.
+        for i in 0..128 {
+            let h = bc.d_bits[i];
+            let e = expected_desktop[i];
+            let mut x = h ^ e;
+
+            for _ in 0..8 {
+                if (x & 0x80) != 0 { eprint!("*"); } else { eprint!("."); };
+                x <<= 1;
+            }
+            if (i & 3) == 3 { eprintln!(""); }
+        }
+
+        assert_eq!(bc.d_bits, &expected_desktop);
+    }
 }
 

@@ -252,6 +252,16 @@ pub struct BlitContext<'a> {
     /// For ascending blits, this will be on the right-hand edge;
     /// for descending blits, on the left-hand edge.
     pub s_lc_mask: u8,
+
+    //--- Rectangle Fields
+
+    /// The number of bytes to add (ascending) or subtract (descending) to the `s_ptr` field to
+    /// advance to the start of the next row of pixels.
+    pub s_modulo: usize,
+
+    /// The number of bytes to add (ascending) or subtract (descending) to the `d_ptr` field to
+    /// advance to the start of the next row of pixels.
+    pub d_modulo: usize,
 }
 
 impl<'a> BlitContext<'a> {
@@ -275,10 +285,12 @@ impl<'a> BlitContext<'a> {
             s_mask: 0xFF,
             s_fc_mask: 0xFF,
             s_lc_mask: 0xFF,
+            s_modulo: 0,
 
             d_bits: dst,
             d_ptr: 0,
             d_span: dst_span,
+            d_modulo: 0,
 
             operation: BlitOp::Or,
         }
@@ -570,6 +582,8 @@ pub fn prepare_blit_rect(
     bc.operation = op;
     bc.s_fc_mask = s_fc_mask;
     bc.s_lc_mask = s_lc_mask;
+    bc.s_modulo = bc.s_span - width_in_bytes;
+    bc.d_modulo = bc.d_span - width_in_bytes;
 
     (width_in_bytes, height, ascending_mode)
 }
@@ -597,11 +611,15 @@ pub fn perform_blit_rect(bc: &mut BlitContext, width_in_bytes: usize, height: us
         for _ in 0..height {
             bc.s_data = data_preload;
             blit_line_ascending(bc, width_in_bytes);
+            bc.s_ptr = bc.s_ptr.overflowing_add(bc.s_modulo).0;
+            bc.d_ptr = bc.d_ptr.overflowing_add(bc.d_modulo).0;
         }
     } else {
         for _ in 0..height {
             bc.s_data = data_preload;
             blit_line_descending(bc, width_in_bytes);
+            bc.s_ptr = bc.s_ptr.overflowing_sub(bc.s_modulo).0;
+            bc.d_ptr = bc.d_ptr.overflowing_sub(bc.d_modulo).0;
         }
     }
 }
