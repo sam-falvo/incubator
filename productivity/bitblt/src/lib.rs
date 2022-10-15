@@ -516,7 +516,7 @@ pub fn prepare_blit_rect(
     let inclusive_src_right = src_right - 1;
     let s_left_column = src_left >> 3;
     let s_right_column = inclusive_src_right >> 3;
-    let s_right_pixel_in_byte = src_right & 7;
+    let s_right_pixel_in_byte = inclusive_src_right & 7;
 
     let dst_right = dst_left + width_in_pixels;
     let dst_bottom = dst_top + height;
@@ -580,8 +580,8 @@ static ASCENDING_FIRST_MASKS: [u8; 8] = [
 ];
 
 static ASCENDING_LAST_MASKS: [u8; 8] = [
-    0b00000000, 0b10000000, 0b11000000, 0b11100000, 0b11110000, 0b11111000, 0b11111100,
-    0b11111110,
+    0b10000000, 0b11000000, 0b11100000, 0b11110000, 0b11111000, 0b11111100, 0b11111110,
+    0b11111111,
 ];
 
 // Sacrifice some memory for easier to maintain source code.
