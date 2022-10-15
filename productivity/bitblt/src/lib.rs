@@ -212,6 +212,10 @@ pub struct BlitContext<'a> {
     /// Index of the next byte to be read from `s_bits`.
     pub s_ptr: usize,
 
+    /// Number of bytes to add to `s_ptr` to advance to the byte directly below it in the source
+    /// bitmap.
+    pub s_span: usize,
+
     /// The number of bits to shift data read from `s_bits`.
     pub s_shift: u8,
 
@@ -229,6 +233,10 @@ pub struct BlitContext<'a> {
 
     /// Index of the next byte to be written to `d_bits`.
     pub d_ptr: usize,
+
+    /// Number of bytes to add to `d_ptr` to advance to the byte directly below it in the
+    /// destination bitmap.
+    pub d_span: usize,
 
     /// The logical operation to apply to the source and destination data.
     pub operation: BlitOp,
@@ -257,10 +265,11 @@ impl<'a> BlitContext<'a> {
     /// These defaults will not be sufficient for most blit operations, however.
     /// For this reason, you should use functions like [[blit_rect]] to configure
     /// the context and perform the blit operation in a single step.
-    pub fn new(src: &'a [u8], dst: &'a mut [u8]) -> Self {
+    pub fn new(src: &'a [u8], src_span: usize, dst: &'a mut [u8], dst_span: usize) -> Self {
         BlitContext {
             s_bits: src,
             s_ptr: 0,
+            s_span: src_span,
             s_shift: 0,
             s_data: 0,
             s_mask: 0xFF,
@@ -269,6 +278,7 @@ impl<'a> BlitContext<'a> {
 
             d_bits: dst,
             d_ptr: 0,
+            d_span: dst_span,
 
             operation: BlitOp::Or,
         }
@@ -295,9 +305,8 @@ impl<'a> BlitContext<'a> {
 /// Increment the source and destination pointers.
 #[inline(always)]
 pub fn blit_byte_ascending(bc: &mut BlitContext) {
-    let raw_s = bc.s_bits[bc.s_ptr];
-    let s = bc.s_mask
-        & ((raw_s as u16 >> bc.s_shift) | ((bc.s_data as u16) << (8 - bc.s_shift))) as u8;
+    let raw_s = bc.s_bits[bc.s_ptr] & bc.s_mask;
+    let s = ((raw_s as u16 >> bc.s_shift) | ((bc.s_data as u16) << (8 - bc.s_shift))) as u8;
     let d = bc.d_bits[bc.d_ptr];
 
     let d = match bc.operation {
@@ -345,9 +354,8 @@ pub fn blit_byte_ascending(bc: &mut BlitContext) {
 /// Decrement the source and destination pointers.
 #[inline(always)]
 pub fn blit_byte_descending(bc: &mut BlitContext) {
-    let raw_s = bc.s_bits[bc.s_ptr];
-    let s = bc.s_mask
-        & (((raw_s as u16) << bc.s_shift) | ((bc.s_data as u16) >> (8 - bc.s_shift))) as u8;
+    let raw_s = bc.s_bits[bc.s_ptr] & bc.s_mask;
+    let s = (((raw_s as u16) << bc.s_shift) | ((bc.s_data as u16) >> (8 - bc.s_shift))) as u8;
     let d = bc.d_bits[bc.d_ptr];
 
     let d = match bc.operation {
@@ -431,6 +439,169 @@ pub fn blit_line_descending(bc: &mut BlitContext, width: usize) {
 
             bc.s_mask = bc.s_lc_mask;
             blit_byte_descending(bc);
+        }
+    }
+}
+
+/// Combines a sub-rectangle of the source bitmap with a corresponding sub-rectangle of the
+/// destination bitmap, and writes the result into the destination bitmap.
+///
+/// The `src_left` and `src_top` arguments
+/// provides the pixel coordinates of the top, left-hand corner
+/// of the sub-rectangle in the source bitmap.
+/// Likewise, `dst_left` and `dst_top`
+/// do the same for the sub-rectangle in the destination bitmap.
+/// Note that the width and height of the sub-rectangle
+/// are determined by `src_right` and `src_bottom`,
+/// which provides the pixel coordinates for the lower right-hand corner
+/// of the source sub-rectangle.
+///
+/// Remember that `src_right` and `src_bottom` are *exclusive* coordinates, not inclusive;
+/// they indicate coordinates that lie between pixels, and are not pixel labels themselves.
+/// Thus, a one-pixel sub-rectangle is described using coordinates (L, T)-(L+1, T+1).
+///
+/// The [[BlitContext]]'s `s_data` field should be initialized with a value that supplies data bits
+/// when shifting the first source byte in each line.  The [[new]] function sets this field to 0,
+/// which is almost always correct.  Note: Whether this data supplies bits for the left-hand or
+/// right-hand edges depends whether the blit operation occurs in ascending (left-hand edge) or
+/// descending (right-hand edge) mode.
+///
+/// # Panics
+///
+/// It is critical that the dimensions of the source sub-rectangle are made such that the
+/// sub-rectangle will also fit in the destination bitmap.  If not, slice indexing panics may
+/// occur.
+pub fn blit_rect(
+    bc: &mut BlitContext,
+    src_left: usize,
+    src_top: usize,
+    src_right: usize,
+    src_bottom: usize,
+    dst_left: usize,
+    dst_top: usize,
+    op: BlitOp,
+) {
+    let (width_in_bytes, height, ascending_mode) = prepare_blit_rect(bc, src_left, src_top, src_right, src_bottom, dst_left, dst_top, op);
+    perform_blit_rect(bc, width_in_bytes, height, ascending_mode);
+}
+
+/// Configures a [[BlitRect]] structure for a rectangular blit operation.
+///
+/// You generally won't be needing this function; it's intended purpose is to facilitate unit
+/// testing.
+///
+/// It answers with a tuple of three results:
+/// - the width (in bytes) and height (in pixels) of the blit, and,
+/// - a flag indicating whether the blit operation is ascending (true) or descending (false).
+///
+/// The [[BlitContext]] will have its fields initialized appropriately for performing a rectangular
+/// blit operation.  The results of this function can be fed directly into [[perform_blit_rect]] to
+/// actually perform the blit operation.
+#[inline(always)]
+pub fn prepare_blit_rect(
+    bc: &mut BlitContext,
+    src_left: usize,
+    src_top: usize,
+    src_right: usize,
+    src_bottom: usize,
+    dst_left: usize,
+    dst_top: usize,
+    op: BlitOp,
+) -> (usize, usize, bool) {
+    // The blitter operates on bytes; we therefore need to know the *byte* coordintes of our source
+    // and destination sub-rectangles.
+    let height = src_bottom - src_top;
+    let width_in_pixels = src_right - src_left;
+
+    let inclusive_src_right = src_right - 1;
+    let s_left_column = src_left >> 3;
+    let s_right_column = inclusive_src_right >> 3;
+    let s_right_pixel_in_byte = src_right & 7;
+
+    let dst_right = dst_left + width_in_pixels;
+    let dst_bottom = dst_top + height;
+    let inclusive_dst_right = dst_right - 1;
+    let d_left_column = dst_left >> 3;
+    let d_right_column = inclusive_dst_right >> 3;
+
+    // If we place the source and destination bitmaps so that their upper lefthand corner bytes
+    // overlap, then the relative placement of source and destination sub-rectangles in these bytes
+    // are used to determine if we should use ascending- or descending-mode blits.  If we're
+    // shifting bitmap data to the right, we need to perform the blit operation in ascending mode.
+    // Otherwise, descending.
+    let s_left_pixel_in_byte = src_left & 7;
+    let d_left_pixel_in_byte = dst_left & 7;
+    let ascending_mode = s_left_pixel_in_byte < d_left_pixel_in_byte;
+
+    // The blit always takes an integral number of bytes to process.  Sometimes, due to the need
+    // for shifting, the number of destination bytes to process is greater than the number of
+    // source bytes, or vice versa.  Thus, we always take the maximum width of either the source or
+    // destination subrectangle.
+    // 
+    // Observation: the source and destination widths should never differ by more than one.
+    let s_width_in_bytes = s_right_column - s_left_column + 1;
+    let d_width_in_bytes = d_right_column - d_left_column + 1;
+    let width_in_bytes = s_width_in_bytes.max(d_width_in_bytes);
+
+    // Determine the upper lefthand byte offset of the source and destination subrectangles.
+    // If descending, we must point at the lower righthand corner instead.
+    let s_ptr: usize;
+    let d_ptr: usize;
+    let s_fc_mask: u8;
+    let s_lc_mask: u8;
+
+    if ascending_mode {
+        s_ptr = (bc.s_span * src_top) + s_left_column;
+        d_ptr = (bc.d_span * dst_top) + d_left_column;
+        s_fc_mask = ASCENDING_FIRST_MASKS[s_left_pixel_in_byte as usize];
+        s_lc_mask = ASCENDING_LAST_MASKS[s_right_pixel_in_byte as usize];
+    } else {
+        s_ptr = (bc.s_span * (src_bottom - 1)) + s_left_column + width_in_bytes - 1;
+        d_ptr = (bc.d_span * (dst_bottom - 1)) + d_left_column + width_in_bytes - 1;
+        s_fc_mask = DESCENDING_FIRST_MASKS[s_right_pixel_in_byte as usize];
+        s_lc_mask = DESCENDING_LAST_MASKS[s_left_pixel_in_byte as usize];
+    }
+
+    // Configure the BlitContext, then hand control over to the ascending or
+    // descending blit line functions for actual processing.
+    bc.s_ptr = s_ptr;
+    bc.s_shift = (d_left_pixel_in_byte as isize - s_left_pixel_in_byte as isize).abs() as u8;
+    bc.d_ptr = d_ptr;
+    bc.operation = op;
+    bc.s_fc_mask = s_fc_mask;
+    bc.s_lc_mask = s_lc_mask;
+
+    (width_in_bytes, height, ascending_mode)
+}
+
+static ASCENDING_FIRST_MASKS: [u8; 8] = [
+    0b11111111, 0b01111111, 0b00111111, 0b00011111, 0b00001111, 0b00000111, 0b00000011,
+    0b00000001,
+];
+
+static ASCENDING_LAST_MASKS: [u8; 8] = [
+    0b00000000, 0b10000000, 0b11000000, 0b11100000, 0b11110000, 0b11111000, 0b11111100,
+    0b11111110,
+];
+
+// Sacrifice some memory for easier to maintain source code.
+// A "sufficiently smart compiler" would know to create aliases here anyway.
+static DESCENDING_FIRST_MASKS: [u8; 8] = ASCENDING_LAST_MASKS;
+static DESCENDING_LAST_MASKS: [u8; 8] = ASCENDING_FIRST_MASKS;
+
+/// Drives a rectangular blit operation to completion.
+#[inline(always)]
+pub fn perform_blit_rect(bc: &mut BlitContext, width_in_bytes: usize, height: usize, ascending_mode: bool) {
+    let data_preload = bc.s_data;
+    if ascending_mode {
+        for _ in 0..height {
+            bc.s_data = data_preload;
+            blit_line_ascending(bc, width_in_bytes);
+        }
+    } else {
+        for _ in 0..height {
+            bc.s_data = data_preload;
+            blit_line_descending(bc, width_in_bytes);
         }
     }
 }
