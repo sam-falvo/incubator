@@ -332,7 +332,7 @@ mod rectangle_level {
         blit_rect(&mut bc, 0, 0, 16, 16, 10, 10, BlitOp::Or);
 
         // Next, we draw the body of the mouse.
-        let mouse_mask: [u8; 48] = [
+        let mouse_body: [u8; 48] = [
             0b00000000, 0b00000000, 0b00000000,
             0b01000000, 0b00000000, 0b00000000,
             0b00110000, 0b00000000, 0b00000000,
@@ -351,7 +351,7 @@ mod rectangle_level {
             0b00000000, 0b00000000, 0b00000000,
         ];
 
-        bc.s_bits = &mouse_mask;
+        bc.s_bits = &mouse_body;
         blit_rect(&mut bc, 0, 0, 16, 16, 10, 10, BlitOp::DandNotS);
 
         // The resulting desktop should look like the mouse pointer is somewhere in the center of
