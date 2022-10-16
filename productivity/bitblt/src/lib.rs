@@ -180,7 +180,7 @@
 /// Black will always fill destination bits with zeros, as it selects no minterms at all.
 /// White will always fill destination bits with ones, as it selects all of them.
 #[repr(usize)]
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum BlitOp {
     Black,
     Nor,
