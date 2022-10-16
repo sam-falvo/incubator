@@ -305,9 +305,9 @@ impl<'a> BlitContext<'a> {
 /// It works as follows:
 ///
 /// Read a byte from the source channel (`s_bits`);
+/// apply the mask in `s_mask`,
 /// shift it to the right by `s_shift` bits and
 /// merge with the discarded bits of the previously read byte.
-/// Then, apply the mask in `s_mask`.
 ///
 /// Next, read a byte from the destination channel (`d_bits`),
 /// and combine with the shifted and masked byte from above
@@ -354,9 +354,9 @@ pub fn blit_byte_ascending(bc: &mut BlitContext) {
 /// It works as follows:
 ///
 /// Read a byte from the source channel (`s_bits`);
+/// apply the mask in `s_mask`,
 /// shift it to the left by `s_shift` bits and
 /// merge with the discarded bits of the previously read byte.
-/// Then, apply the mask in `s_mask`.
 ///
 /// Next, read a byte from the destination channel (`d_bits`),
 /// and combine with the shifted and masked byte from above
