@@ -9,3 +9,4 @@ edition = "2021"
 bitblt = { path = "../bitblt" }
 stencil = { path = "../stencil" }
 sdlstate = { path = "../sdlstate" }
+sdl2 = "0.35.2"

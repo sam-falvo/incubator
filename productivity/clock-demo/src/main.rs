@@ -1,25 +1,26 @@
 extern crate sdlstate;
 extern crate stencil;
+extern crate sdl2;
 
 use bitblt::{BlitOp, BlitContext, blit_rect};
-use stencil::stencil::Stencil;
-use stencil::types::{Dimension, Unit};
+use stencil::stencil::{Stencil, Draw, Pattern};
+use stencil::types::{Dimension, Unit, Point, Rect};
 use stencil::simple_bitmap_font::SimpleBitmapFont;
 
 use sdlstate::SdlState;
 use std::{thread, time};
 
+use sdl2::event::{Event, WindowEvent};
+
 const W: Dimension = 320;
 const H: Dimension = 200;
 
-static DESKTOP_PATTERN: [u8; 8] = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55];
-
-static BLACK_PATTERN: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-
-static WHITE_PATTERN: [u8; 8] = [255, 255, 255, 255, 255, 255, 255, 255];
+static DESKTOP_PATTERN: Pattern = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55];
+static BLACK_PATTERN: Pattern = [0, 0, 0, 0, 0, 0, 0, 0];
+static WHITE_PATTERN: Pattern = [255, 255, 255, 255, 255, 255, 255, 255];
 
 fn draw_dialog_box(
-    st: &mut Stencil,
+    st: &mut impl Draw,
     paper_left: Unit,
     paper_top: Unit,
     paper_right: Unit,
@@ -52,45 +53,105 @@ fn draw_dialog_box(
     );
 }
 
+fn repaint(desktop: &mut Stencil, r: Rect, sdl: &mut SdlState) {
+    let ((left, top), (right, bottom)) = r;
+    let (left, top) = (left as usize, top as usize);
+    let (right, bottom) = (right as usize, bottom as usize);
+    let width = right - left;
+    let height = bottom - top;
+
+    sdl.paint_with(|ctx| {
+        ctx.paste_stamp_be(
+            (left, top),
+            (width, height),
+            desktop.get_span(),
+            (left, top),
+            desktop.borrow_bits(),
+        );
+    });
+}
+
 fn main() {
     let mut sdl = SdlState::new("Clock Demo", W as u32, H as u32);
-    let desktop_opt = Stencil::new_with_dimensions(W as usize, H as usize);
+    let mut event_pump = sdl.context.event_pump().unwrap();
+    let mut event_iter = event_pump.wait_iter();
 
-    match desktop_opt {
-        Some(mut desktop) => {
-            desktop.filled_rectangle((0, 0), (W, H), &DESKTOP_PATTERN);
-            for i in 0..65536 {
-                draw_dialog_box(&mut desktop, 80, 50, 240, 150);
+    let mut desktop = Stencil::new_with_dimensions(W, H);
 
-                demo(&mut desktop, i);
+    let mut done = false;
+    let mut command = demo_init(&mut desktop);
+    while !done {
+        match command {
+            Cmd::Nop => (),
+            Cmd::Quit => done = true,
+            Cmd::Repaint(r) => repaint(&mut desktop, r, &mut sdl),
+            Cmd::WaitEvent => {
+                let event = event_iter.next();
 
-                sdl.paint_with(|ctx| {
-                    ctx.paste_stamp_be(
-                        (0, 0),
-                        (W as usize, H as usize),
-                        desktop.get_span(),
-                        (0, 0),
-                        desktop.borrow_bits(),
-                    );
-                });
-
-                thread::sleep(time::Duration::new(0, 50000000));
-            }
-        }
-
-        _ => {
-            panic!("Thou dost expect too much.");
-        }
-    };
+                command = Cmd::Nop;
+                if let Some(e) = event {
+                    match e {
+                        Event::Quit {..} => command = Cmd::Quit,
+                        Event::Window {timestamp: _, window_id: _, win_event: we} => {
+                            if we == WindowEvent::Exposed {
+                                repaint(&mut desktop, ((0, 0), (W, H)), &mut sdl)
+                            }
+                        }
+                        _ => ()
+                    }
+                }
+            },
+        };
+        command = demo_tick(&mut desktop, command);
+    }
 }
 
 use crate::stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 
-fn demo(desktop: &mut Stencil, _frame: usize) {
+enum Cmd {
+    Nop,
+    Quit,
+    Repaint(Rect),
+    WaitEvent,
+}
+
+static CLOSE_BITMAP: [u8; 30] = [
+    0b11111111, 0b11110000, 0,
+    0b11000000, 0b00110000, 0,
+    0b11011001, 0b10110000, 0,
+    0b11001111, 0b00110000, 0,
+    0b11000110, 0b00110000, 0,
+    0b11000110, 0b00110000, 0,
+    0b11001111, 0b00110000, 0,
+    0b11011001, 0b10110000, 0,
+    0b11000000, 0b00110000, 0,
+    0b11111111, 0b11110000, 0,
+];
+
+fn demo_init(desktop: &mut Stencil) -> Cmd {
+    let (w, h) = desktop.dimensions;
+
+    desktop.filled_rectangle((0, 0), (w, h), &DESKTOP_PATTERN);
+    draw_dialog_box(desktop, 80, 50, 240, 150);
+    {
+        // to scope a mutable borrow
+        let mut bc = BlitContext::new(&CLOSE_BITMAP, 3, &mut desktop.bits, (w >> 3) as usize);
+        blit_rect(&mut bc, 0, 0, 12, 10, 82, 51, BlitOp::DandNotS);
+    }
+    desktop.horizontal_line((80, 62), 240, 0x00);
+
     let font = SYSTEM_BITMAP_FONT;
     let op = BlitOp::Xor;
+    let _ = paint_text(desktop, op, &font, 98, 52 + font.baseline, "<-- Click to close").unwrap();
 
-    let _ = paint_text(desktop, op, &font, 84, 60, "Hello world!").unwrap();
+    Cmd::Repaint(((0, 0), (w, h)))
+}
+
+fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
+    match previous {
+        Cmd::Quit => previous,
+        _ => Cmd::WaitEvent,
+    }
 }
 
 fn paint_text(stencil: &mut Stencil, op: BlitOp, font: &SimpleBitmapFont, mut x: Unit, y: Unit, text: &str) -> Option<Unit> {
@@ -159,4 +220,3 @@ fn paint_char(stencil: &mut Stencil, op: BlitOp, font: &SimpleBitmapFont, x: Uni
     // Return the next glyph location.
     Some(new_cursor_position)
 }
-
