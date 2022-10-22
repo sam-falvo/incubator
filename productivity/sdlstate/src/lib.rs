@@ -2,6 +2,7 @@
 
 /// A convenient anchor for SDL-related data structures.
 pub struct SdlState {
+    pub context: sdl2::Sdl,
     pub canvas: sdl2::render::Canvas<sdl2::video::Window>,
     pub width: u32,
     pub height: u32,
@@ -18,6 +19,7 @@ impl SdlState {
         let canvas = window.into_canvas().build().unwrap();
 
         Self {
+            context: sdl,
             canvas,
             width,
             height,
