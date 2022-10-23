@@ -111,34 +111,58 @@ fn clicked_in_close_gadget(point: Point) -> bool {
     (81 <= x) && (x < 94) && (50 <= y) && (y < 62)
 }
 
-static mut SHOW_COLON: bool = false;
+static mut HIDE_COLON: bool = false;
 
 /// Redraw the current time
 fn redraw_time(desktop: &mut Stencil) -> Cmd {
     let dt: DateTime<Local> = Local::now();
-    let time_string = format!("{}", unsafe {
-        SHOW_COLON = !SHOW_COLON;
-        if SHOW_COLON {
-            dt.format("%H:%M:%S")
-        } else {
-            dt.format("%H:%M %S")
-        }
-    });
+    let time_string_1 = format!("{}", dt.format("%H:%M"));
+    let time_string_2 = format!("{}", dt.format(":%S"));
+    let font = &SYSTEM_BITMAP_FONT;
+    let y = 100 + font.baseline;
+
+    // Erase the old time pattern.  70px x 20px ought to be enough for anyone.
 
     desktop.filled_rectangle((160, 100), (230, 120), &WHITE_PATTERN);
 
-    let font = &SYSTEM_BITMAP_FONT;
-    let xopt = paint_text(
+    // Print the time string, but do so in a way that lets us capture where the seconds colon sits
+    // on the screen.
+
+    let xcolon = paint_text(
         desktop,
         BlitOp::Xor,
         font,
         160,
-        100 + font.baseline,
-        &time_string,
-    );
-    if let Some(x) = xopt {
-        Cmd::Repaint(((160, 100), (x, 100 + font.height)))
-    } else {
-        Cmd::WaitEvent
+        y,
+        &time_string_1,
+    ).unwrap();
+
+    let xmax = paint_text(
+        desktop,
+        BlitOp::Xor,
+        font,
+        xcolon,
+        y,
+        &time_string_2,
+    ).unwrap();
+
+    // Now, if we need to hide the colon, use the XOR operator to remove it.
+
+    unsafe {
+        HIDE_COLON = !HIDE_COLON;
+        if HIDE_COLON {
+            let _ = paint_text(
+                desktop,
+                BlitOp::Xor,
+                font,
+                xcolon,
+                y,
+                ":"
+            ).unwrap();
+        }
     }
+
+    // Tell event loop to commit changes to the desktop.
+
+    Cmd::Repaint(((160, 100), (xmax, 100 + font.height)))
 }
