@@ -100,8 +100,9 @@ impl<'a> TextureContext<'a> {
         let pixel_size = 4; // because of RGBA8888; TODO: query size from the enum.
 
         self.texture.with_lock(None, |pixels: &mut [u8], stride| {
-            for y in src_y..src_y + height {
-                let mut o = (y + dst_y) * stride + (dst_x * pixel_size);
+            for i in 0..height {
+                let y = i + src_y;
+                let mut o = (i + dst_y) * stride + (dst_x * pixel_size);
                 for x in src_x..src_x + width {
                     let bit_pos = 7 - (x & 7);
                     let byte_pos = x >> 3;
