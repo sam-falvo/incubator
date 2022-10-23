@@ -2,6 +2,8 @@ extern crate sdlstate;
 extern crate stencil;
 extern crate sdl2;
 
+use chrono::prelude::{DateTime, Local};
+
 use bitblt::{BlitOp, BlitContext, blit_rect};
 use stencil::stencil::{Stencil, Draw, Pattern};
 use stencil::types::{Dimension, Unit, Point, Rect};
@@ -12,6 +14,7 @@ use std::{thread, time};
 
 use sdl2::event::{Event, WindowEvent};
 use sdl2::mouse::MouseButton;
+use sdl2::libc;
 
 const W: Dimension = 320;
 const H: Dimension = 200;
@@ -59,8 +62,12 @@ fn draw_dialog_box(
 ///
 /// This function performs color-expansion and/or retiling as appropriate to render the contents of
 /// the `desktop` stencil to the display.
-fn repaint(desktop: &mut Stencil, r: Rect, sdl: &mut SdlState) {
-    let ((left, top), (right, bottom)) = r;
+fn repaint(desktop: &mut Stencil, sdl: &mut SdlState) {
+    // Sadly, because of how SDL2 works with modern video equipment,
+    // we must refresh the entire surface; we can't be clever and just
+    // refresh a subset of a surface.  Therefore, the `r` parameter is
+    // unused.
+    let ((left, top), (right, bottom)) = ((0, 0), desktop.dimensions);
     let (left, top) = (left as usize, top as usize);
     let (right, bottom) = (right as usize, bottom as usize);
     let width = right - left;
@@ -94,39 +101,70 @@ fn repaint(desktop: &mut Stencil, r: Rect, sdl: &mut SdlState) {
 /// well, indicating the most recently processed command.  This is sometimes useful for multi-step
 /// command processing.
 fn main() {
+    // Create our SDL bindings and unpack our toybox.
     let mut sdl = SdlState::new("Clock Demo", W as u32, H as u32);
+    let event_subsystem = sdl.context.event().unwrap();
+    let timer_subsystem = sdl.context.timer().unwrap();
+
+    // Gain access to our event queue.
     let mut event_pump = sdl.context.event_pump().unwrap();
     let mut event_iter = event_pump.wait_iter();
 
+    // Create a 500ms timer that generates a TimerTick event when it fires.
+    // 
+    // To do this, we must first register our TimerTick event ID.
+    let TimerTick = unsafe {
+        event_subsystem.register_event().unwrap()
+    };
+    const PERIOD: u32 = 500; // milliseconds
+    let timer = timer_subsystem.add_timer(PERIOD, Box::new(|| {
+        event_subsystem.push_event(Event::User {
+            timestamp: 0,
+            window_id: 0,
+            type_: TimerTick,
+            code: 0,
+            data1: 0 as *mut libc::c_void,
+            data2: 0 as *mut libc::c_void,
+        });
+        PERIOD
+    }));
+
+    // Create our desktop stencil.
     let mut desktop = Stencil::new_with_dimensions(W, H);
 
+    // Enter the main loop for the clock.
+    // We start by initializing the clock.
+    // Then, delegate to the timer's event handler for every event we receive.
     let mut done = false;
     let mut command = demo_init(&mut desktop);
     while !done {
         match command {
             Cmd::Nop => (),
             Cmd::Quit => done = true,
-            Cmd::Repaint(r) => repaint(&mut desktop, r, &mut sdl),
+            Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
             Cmd::WaitEvent => {
                 let event = event_iter.next();
 
-                command = Cmd::Nop;
-                if let Some(e) = event {
+                command = if let Some(e) = event {
                     match e {
-                        Event::Quit {..} => command = Cmd::Quit,
-                        Event::Window {timestamp: _, window_id: _, win_event: we} => {
+                        Event::Quit {..} => Cmd::Quit,
+                        Event::Window {win_event: we, ..} => {
                             if we == WindowEvent::Exposed {
-                                repaint(&mut desktop, ((0, 0), (W, H)), &mut sdl)
+                                repaint(&mut desktop, &mut sdl)
                             }
+                            Cmd::Nop
                         },
                         Event::MouseButtonUp {mouse_btn: b, x, y, ..} => {
-                            command = Cmd::ButtonUp { button: button_for(b), at: (x as Unit, y as Unit)}
+                            Cmd::ButtonUp { button: button_for(b), at: (x as Unit, y as Unit)}
                         },
                         Event::MouseButtonDown {mouse_btn: b, x, y, ..} => {
-                            command = Cmd::ButtonDown { button: button_for(b), at: (x as Unit, y as Unit)}
+                            Cmd::ButtonDown { button: button_for(b), at: (x as Unit, y as Unit)}
                         },
-                        _ => ()
+                        Event::User {type_: TimerTick, ..} => Cmd::TimerTick,
+                        _ => Cmd::Nop,
                     }
+                } else {
+                    Cmd::Nop
                 }
             },
             _ => command = Cmd::WaitEvent,
@@ -154,6 +192,7 @@ enum Cmd {
     WaitEvent,
     ButtonUp { button: usize, at: Point },
     ButtonDown { button: usize, at: Point },
+    TimerTick,
 }
 
 static CLOSE_BITMAP: [u8; 30] = [
@@ -193,14 +232,47 @@ fn demo_init(desktop: &mut Stencil) -> Cmd {
 fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
     match previous {
         Cmd::Quit => previous,
-        Cmd::ButtonUp { button: _, at: (x, y) } => {
-            if (81 <= x) && (x < 94) && (50 <= y) && (y < 62) {
+        Cmd::ButtonUp { at: point, .. } => {
+            if clicked_in_close_gadget(point) {
                 Cmd::Quit
             } else {
-                Cmd::Nop
+                Cmd::WaitEvent
             }
         }
+        Cmd::TimerTick => {
+            redraw_time(desktop)
+        }
         _ => Cmd::WaitEvent,
+    }
+}
+
+fn clicked_in_close_gadget(point: Point) -> bool {
+    let (x, y) = point;
+    (81 <= x) && (x < 94) && (50 <= y) && (y < 62)
+}
+
+static mut show_colon: bool = false;
+
+/// Redraw the current time
+fn redraw_time(desktop: &mut Stencil) -> Cmd {
+    let dt: DateTime<Local> = Local::now();
+    let time_string = format!("{}", unsafe {
+        show_colon = !show_colon;
+        if show_colon {
+            dt.format("%H:%M:%S")
+        } else {
+            dt.format("%H:%M %S")
+        }
+    });
+
+    desktop.filled_rectangle((160, 100), (230, 120), &WHITE_PATTERN);
+
+    let font = &SYSTEM_BITMAP_FONT;
+    let xopt = paint_text(desktop, BlitOp::Xor, font, 160, 100 + font.baseline, &time_string);
+    if let Some(x) = xopt {
+        Cmd::Repaint(((160, 100),(x, 100 + font.height)))
+    } else {
+        Cmd::WaitEvent
     }
 }
 
