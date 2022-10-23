@@ -11,6 +11,7 @@ use sdlstate::SdlState;
 use std::{thread, time};
 
 use sdl2::event::{Event, WindowEvent};
+use sdl2::mouse::MouseButton;
 
 const W: Dimension = 320;
 const H: Dimension = 200;
@@ -96,13 +97,29 @@ fn main() {
                             if we == WindowEvent::Exposed {
                                 repaint(&mut desktop, ((0, 0), (W, H)), &mut sdl)
                             }
-                        }
+                        },
+                        Event::MouseButtonUp {mouse_btn: b, x, y, ..} => {
+                            command = Cmd::ButtonUp { button: button_for(b), at: (x as Unit, y as Unit)}
+                        },
+                        Event::MouseButtonDown {mouse_btn: b, x, y, ..} => {
+                            command = Cmd::ButtonDown { button: button_for(b), at: (x as Unit, y as Unit)}
+                        },
                         _ => ()
                     }
                 }
             },
+            _ => command = Cmd::WaitEvent,
         };
         command = demo_tick(&mut desktop, command);
+    }
+}
+
+fn button_for(b: MouseButton) -> usize {
+    match b {
+        MouseButton::Left => 1,
+        MouseButton::Middle => 2,
+        MouseButton::Right => 3,
+        _ => 0,
     }
 }
 
@@ -113,6 +130,8 @@ enum Cmd {
     Quit,
     Repaint(Rect),
     WaitEvent,
+    ButtonUp { button: usize, at: Point },
+    ButtonDown { button: usize, at: Point },
 }
 
 static CLOSE_BITMAP: [u8; 30] = [
@@ -150,6 +169,13 @@ fn demo_init(desktop: &mut Stencil) -> Cmd {
 fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
     match previous {
         Cmd::Quit => previous,
+        Cmd::ButtonUp { button: _, at: (x, y) } => {
+            if (82 <= x) && (x < 94) && (51 <= y) && (y < 62) {
+                Cmd::Quit
+            } else {
+                Cmd::Nop
+            }
+        }
         _ => Cmd::WaitEvent,
     }
 }
