@@ -1,18 +1,18 @@
-mod text;
 mod app;
+mod text;
 
+extern crate chrono;
+extern crate sdl2;
 extern crate sdlstate;
 extern crate stencil;
-extern crate sdl2;
-extern crate chrono;
 
 use stencil::stencil::Stencil;
-use stencil::types::{Dimension, Unit, Point, Rect};
+use stencil::types::{Dimension, Point, Rect, Unit};
 
-use sdlstate::SdlState;
 use sdl2::event::{Event, WindowEvent};
-use sdl2::mouse::MouseButton;
 use sdl2::libc;
+use sdl2::mouse::MouseButton;
+use sdlstate::SdlState;
 
 use app::{demo_init, demo_tick};
 
@@ -72,23 +72,26 @@ fn main() {
     let mut event_iter = event_pump.wait_iter();
 
     // Create a 500ms timer that generates a TimerTick event when it fires.
-    // 
+    //
     // To do this, we must first register our TimerTick event ID.
-    let timer_tick = unsafe {
-        event_subsystem.register_event().unwrap()
-    };
+    let timer_tick = unsafe { event_subsystem.register_event().unwrap() };
     const PERIOD: u32 = 500; // milliseconds
-    let _timer = timer_subsystem.add_timer(PERIOD, Box::new(|| {
-        let _ = event_subsystem.push_event(Event::User {
-            timestamp: 0,
-            window_id: 0,
-            type_: timer_tick,
-            code: 0,
-            data1: 0 as *mut libc::c_void,
-            data2: 0 as *mut libc::c_void,
-        }).unwrap();
-        PERIOD
-    }));
+    let _timer = timer_subsystem.add_timer(
+        PERIOD,
+        Box::new(|| {
+            let _ = event_subsystem
+                .push_event(Event::User {
+                    timestamp: 0,
+                    window_id: 0,
+                    type_: timer_tick,
+                    code: 0,
+                    data1: 0 as *mut libc::c_void,
+                    data2: 0 as *mut libc::c_void,
+                })
+                .unwrap();
+            PERIOD
+        }),
+    );
 
     // Create our desktop stencil.
     let mut desktop = Stencil::new_with_dimensions(W, H);
@@ -108,26 +111,32 @@ fn main() {
 
                 command = if let Some(e) = event {
                     match e {
-                        Event::Quit {..} => Cmd::Quit,
-                        Event::Window {win_event: we, ..} => {
+                        Event::Quit { .. } => Cmd::Quit,
+                        Event::Window { win_event: we, .. } => {
                             if we == WindowEvent::Exposed {
                                 repaint(&mut desktop, &mut sdl)
                             }
                             Cmd::Nop
+                        }
+                        Event::MouseButtonUp {
+                            mouse_btn: b, x, y, ..
+                        } => Cmd::ButtonUp {
+                            button: button_for(b),
+                            at: (x as Unit, y as Unit),
                         },
-                        Event::MouseButtonUp {mouse_btn: b, x, y, ..} => {
-                            Cmd::ButtonUp { button: button_for(b), at: (x as Unit, y as Unit)}
+                        Event::MouseButtonDown {
+                            mouse_btn: b, x, y, ..
+                        } => Cmd::ButtonDown {
+                            button: button_for(b),
+                            at: (x as Unit, y as Unit),
                         },
-                        Event::MouseButtonDown {mouse_btn: b, x, y, ..} => {
-                            Cmd::ButtonDown { button: button_for(b), at: (x as Unit, y as Unit)}
-                        },
-                        Event::User {type_: t, ..} if t == timer_tick => Cmd::TimerTick,
+                        Event::User { type_: t, .. } if t == timer_tick => Cmd::TimerTick,
                         _ => Cmd::Nop,
                     }
                 } else {
                     Cmd::Nop
                 }
-            },
+            }
             _ => command = Cmd::WaitEvent,
         };
         command = demo_tick(&mut desktop, command);
@@ -153,4 +162,3 @@ pub enum Cmd {
     ButtonDown { button: usize, at: Point },
     TimerTick,
 }
-

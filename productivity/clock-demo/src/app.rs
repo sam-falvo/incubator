@@ -1,15 +1,19 @@
-use stencil::stencil::{Stencil, Draw, Pattern};
-use stencil::types::{Point, Unit};
-use crate::Cmd;
 use crate::text::paint_text;
-use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+use crate::Cmd;
+use bitblt::{blit_rect, BlitContext, BlitOp};
 use chrono::prelude::{DateTime, Local};
-use bitblt::{BlitOp, BlitContext, blit_rect};
+use stencil::stencil::{Draw, Pattern, Stencil};
+use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+use stencil::types::{Point, Unit};
 
 static DESKTOP_PATTERN: Pattern = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55];
 static BLACK_PATTERN: Pattern = [0, 0, 0, 0, 0, 0, 0, 0];
 static WHITE_PATTERN: Pattern = [255, 255, 255, 255, 255, 255, 255, 255];
 
+/// A monochrome bitmap of the application close gadget.
+/// Although only 12x10 pixels, it's arranged as a 24x10 bitmap
+/// to accomodate a bitblit::blit_rect bug.
+/// See its docs and unit tests for more details.
 static CLOSE_BITMAP: [u8; 30] = [
     0b11111111, 0b11110000, 0,
     0b10000000, 0b00010000, 0,
@@ -73,7 +77,15 @@ pub fn demo_init(desktop: &mut Stencil) -> Cmd {
 
     let font = SYSTEM_BITMAP_FONT;
     let op = BlitOp::Xor;
-    let _ = paint_text(desktop, op, &font, 98, 52 + font.baseline, "<-- Click to close").unwrap();
+    let _ = paint_text(
+        desktop,
+        op,
+        &font,
+        98,
+        52 + font.baseline,
+        "<-- Click to close",
+    )
+    .unwrap();
 
     Cmd::Repaint(((0, 0), (w, h)))
 }
@@ -89,9 +101,7 @@ pub fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
                 Cmd::WaitEvent
             }
         }
-        Cmd::TimerTick => {
-            redraw_time(desktop)
-        }
+        Cmd::TimerTick => redraw_time(desktop),
         _ => Cmd::WaitEvent,
     }
 }
@@ -118,11 +128,17 @@ fn redraw_time(desktop: &mut Stencil) -> Cmd {
     desktop.filled_rectangle((160, 100), (230, 120), &WHITE_PATTERN);
 
     let font = &SYSTEM_BITMAP_FONT;
-    let xopt = paint_text(desktop, BlitOp::Xor, font, 160, 100 + font.baseline, &time_string);
+    let xopt = paint_text(
+        desktop,
+        BlitOp::Xor,
+        font,
+        160,
+        100 + font.baseline,
+        &time_string,
+    );
     if let Some(x) = xopt {
-        Cmd::Repaint(((160, 100),(x, 100 + font.height)))
+        Cmd::Repaint(((160, 100), (x, 100 + font.height)))
     } else {
         Cmd::WaitEvent
     }
 }
-
