@@ -20,21 +20,22 @@ static DESKTOP_PATTERN: Pattern = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x5
 static BLACK_PATTERN: Pattern = [0, 0, 0, 0, 0, 0, 0, 0];
 static WHITE_PATTERN: Pattern = [255, 255, 255, 255, 255, 255, 255, 255];
 
+/// Draws a simple dialog box onto the provided stencil.
 fn draw_dialog_box(
-    st: &mut impl Draw,
+    st: &mut Stencil,
     paper_left: Unit,
     paper_top: Unit,
     paper_right: Unit,
     paper_bottom: Unit,
 ) {
-    let border_left = paper_left - 2;
+    let border_left = paper_left - 1;
     let border_top = paper_top - 1;
-    let border_right = paper_right + 2;
+    let border_right = paper_right + 1;
     let border_bottom = paper_bottom + 1;
 
-    let shadow_left = border_left + 2;
+    let shadow_left = border_left + 1;
     let shadow_top = border_top + 1;
-    let shadow_right = border_right + 2;
+    let shadow_right = border_right + 1;
     let shadow_bottom = border_bottom + 1;
 
     st.filled_rectangle(
@@ -54,6 +55,10 @@ fn draw_dialog_box(
     );
 }
 
+/// Repaint the screen and make it visible to the human operator.
+///
+/// This function performs color-expansion and/or retiling as appropriate to render the contents of
+/// the `desktop` stencil to the display.
 fn repaint(desktop: &mut Stencil, r: Rect, sdl: &mut SdlState) {
     let ((left, top), (right, bottom)) = r;
     let (left, top) = (left as usize, top as usize);
@@ -72,6 +77,22 @@ fn repaint(desktop: &mut Stencil, r: Rect, sdl: &mut SdlState) {
     });
 }
 
+/// The main entry point is ultimately responsible for driving the entire application environment.
+/// It creates the SDL (or other platform-specific) frame buffer surface on which we ultimately
+/// render our desktop environment.  It then integrates with the SDL (or platform-specific) event
+/// sources to generate what the clock application considers as low-level events: button click
+/// events, mouse movement events, and so forth.
+///
+/// From this event loop's perspective, the entire environment is comprised of just two functions:
+/// [[demo_init]] and [[demo_tick]].  The former is responsible for configuring the application
+/// environment, including painting the initial desktop environment.  The latter is responsible for
+/// handling subsequent events.
+///
+/// Note that this event loop considers two sources of events: the application itself and SDL.
+/// For this reason, application-generated events are called *commands* (hence, `enum Cmd`), since
+/// they tell `main` what to do next.  Note that [[demo_tick]] accepts a command as an input as
+/// well, indicating the most recently processed command.  This is sometimes useful for multi-step
+/// command processing.
 fn main() {
     let mut sdl = SdlState::new("Clock Demo", W as u32, H as u32);
     let mut event_pump = sdl.context.event_pump().unwrap();
@@ -114,6 +135,7 @@ fn main() {
     }
 }
 
+/// Translate SDL-specific mouse button identity to something more convenient to work with.
 fn button_for(b: MouseButton) -> usize {
     match b {
         MouseButton::Left => 1,
@@ -136,17 +158,18 @@ enum Cmd {
 
 static CLOSE_BITMAP: [u8; 30] = [
     0b11111111, 0b11110000, 0,
-    0b11000000, 0b00110000, 0,
-    0b11011001, 0b10110000, 0,
-    0b11001111, 0b00110000, 0,
-    0b11000110, 0b00110000, 0,
-    0b11000110, 0b00110000, 0,
-    0b11001111, 0b00110000, 0,
-    0b11011001, 0b10110000, 0,
-    0b11000000, 0b00110000, 0,
+    0b10000000, 0b00010000, 0,
+    0b10011001, 0b10010000, 0,
+    0b10010000, 0b10010000, 0,
+    0b10000000, 0b00010000, 0,
+    0b10000000, 0b00010000, 0,
+    0b10010000, 0b10010000, 0,
+    0b10011001, 0b10010000, 0,
+    0b10000000, 0b00010000, 0,
     0b11111111, 0b11110000, 0,
 ];
 
+/// Configure the initial state of the clock application.
 fn demo_init(desktop: &mut Stencil) -> Cmd {
     let (w, h) = desktop.dimensions;
 
@@ -155,7 +178,7 @@ fn demo_init(desktop: &mut Stencil) -> Cmd {
     {
         // to scope a mutable borrow
         let mut bc = BlitContext::new(&CLOSE_BITMAP, 3, &mut desktop.bits, (w >> 3) as usize);
-        blit_rect(&mut bc, 0, 0, 12, 10, 82, 51, BlitOp::DandNotS);
+        blit_rect(&mut bc, 0, 0, 12, 10, 81, 51, BlitOp::DandNotS);
     }
     desktop.horizontal_line((80, 62), 240, 0x00);
 
@@ -166,11 +189,12 @@ fn demo_init(desktop: &mut Stencil) -> Cmd {
     Cmd::Repaint(((0, 0), (w, h)))
 }
 
+/// Process input events for the clock application.
 fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
     match previous {
         Cmd::Quit => previous,
         Cmd::ButtonUp { button: _, at: (x, y) } => {
-            if (82 <= x) && (x < 94) && (51 <= y) && (y < 62) {
+            if (81 <= x) && (x < 94) && (50 <= y) && (y < 62) {
                 Cmd::Quit
             } else {
                 Cmd::Nop
@@ -180,6 +204,8 @@ fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
     }
 }
 
+/// Try to paint an entire string onto the stencil.  If not able to do so, answer with None.  Otherwise,
+/// an updated X-coordinate is returned.
 fn paint_text(stencil: &mut Stencil, op: BlitOp, font: &SimpleBitmapFont, mut x: Unit, y: Unit, text: &str) -> Option<Unit> {
     for b in text.bytes() {
         let new_x_opt = paint_char(stencil, op, font, x, y, b as u8);
@@ -192,8 +218,8 @@ fn paint_text(stencil: &mut Stencil, op: BlitOp, font: &SimpleBitmapFont, mut x:
     Some(x)
 }
 
-// Try to paint a character onto the stencil.  If not able to do so, answer with None.  Otherwise,
-// an updated X-coordinate is returned.
+/// Try to paint a character onto the stencil.  If not able to do so, answer with None.  Otherwise,
+/// an updated X-coordinate is returned.
 fn paint_char(stencil: &mut Stencil, op: BlitOp, font: &SimpleBitmapFont, x: Unit, y: Unit, mut char: u8) -> Option<Unit> {
     // If not representable in the glyph set of the font, assume the undefined character glyph,
     // which by definition, is always at highest_char+1 mod 256.
