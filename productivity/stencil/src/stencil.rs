@@ -49,7 +49,7 @@
 //! but, column 6 does not.
 
 use std::mem;
-use crate::types::{Unit, Point, Dimension, Rect};
+use crate::types::{Unit, Point, Dimension};
 
 /// A pattern is an 8x8 pixel tile.
 pub type Pattern = [u8; 8];
