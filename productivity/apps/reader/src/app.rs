@@ -33,11 +33,10 @@ impl Initializable for Reader {
         draw_desktop(desktop);
         draw_dialog_box(desktop, 8, 8, width - 8, height - 8);
 
-        let file_contents = fs::read_to_string("lorem-ipsum.txt");
+        let file_contents = fs::read_to_string("Lorem-ipsum.txt");
         match file_contents {
             Err(e) => {
                 let error_reason = format!("Could not open lorem-ipsum.txt because: {}", e);
-                eprintln!("{}", error_reason);
 
                 { // to scope a mutable borrow.
                     let mut printer = SimplePrinter::new(
@@ -88,9 +87,26 @@ impl<'a, 'b> SimplePrinter<'a, 'b> {
         }
     }
 
+    fn carriage_return(&mut self) {
+        self.head.0 = self.margins.0.0;
+    }
+
+    fn line_feed(&mut self) {
+        self.head.1 += self.font.height;
+    }
+
     fn line_wrap(&mut self, b: u8) {
-        self.head = (self.margins.0.0, self.head.1 + self.font.height);
+        self.carriage_return();
+        self.line_feed();
         self.print_byte(b)
+    }
+
+    fn handle_byte(&mut self, b: u8) {
+        match b {
+            0x0D => self.carriage_return(),
+            0x0A => { self.carriage_return(); self.line_feed(); },
+            _ => self.print_byte(b),
+        }
     }
 }
 
@@ -106,26 +122,24 @@ impl Printable for SimplePrinter<'_, '_> {
             let some_b = text_iter.next();
             match some_b {
                 None => break,
-                Some(b) => {
-                    self.print_byte(b);
-                }
+                Some(b) => self.handle_byte(b),
             }
         }
     }
 
-    fn print_byte(&mut self, mut b: u8) {
+    fn print_byte(&mut self, b: u8) {
         // If not representable in the glyph set of the font, assume the undefined character glyph,
         // which by definition, is always at highest_char+1 mod 256.
         let highest_character = self.font.highest_char;
         let lowest_character = self.font.lowest_char;
+        let mut glyph_index = b as usize;
 
         if (b < lowest_character) || (b > highest_character) {
-            b = highest_character.overflowing_add(1).0;
+            glyph_index = (highest_character as usize).overflowing_add(1).0;
         }
-        b -= lowest_character;
+        glyph_index -= lowest_character as usize;
 
         // Let's expand this to a valid array index.
-        let glyph_index = b as usize;
 
         let left_edge = self.font.left_edges[glyph_index];
         let right_edge = self.font.left_edges[glyph_index + 1];
