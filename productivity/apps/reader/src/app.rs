@@ -1,4 +1,5 @@
-use stencil::stencil::{Pattern, Draw};
+use stencil::stencil::Draw;
+use stencil::utils::draw_desktop;
 
 pub struct Reader {
 }
@@ -13,13 +14,9 @@ pub trait Initializable {
     fn init(&mut self, desktop: &mut impl Draw);
 }
 
-static DESKTOP_PATTERN: Pattern = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55];
-
 impl Initializable for Reader {
     fn init(&mut self, desktop: &mut impl Draw) {
-        let (width, height) = desktop.get_dimensions();
-
-        desktop.filled_rectangle((0, 0), (width, height), &DESKTOP_PATTERN);
+        draw_desktop(desktop);
     }
 }
 
