@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitblt = { path = "../bitblt" }
-stencil = { path = "../stencil" }
-sdlstate = { path = "../sdlstate" }
+bitblt = { path = "../../services/bitblt" }
+stencil = { path = "../../services/stencil" }
+sdlstate = { path = "../../services/sdlstate" }
 sdl2 = "0.35.2"
 chrono = "0.4"
