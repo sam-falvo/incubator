@@ -56,6 +56,9 @@ pub type Pattern = [u8; 8];
 
 /// Stencil and stencil-like types can support Draw to offer a basic set of drawing primitives.
 pub trait Draw {
+    /// Retrieve the dimensions of this stencil.
+    fn get_dimensions(&self) -> Point;
+
     /// Draw a filled rectangle with the given pattern.
     /// 
     /// If the right coordinate of the rectangle falls to the left of the left edge,
@@ -249,6 +252,10 @@ mod canonize_hline_tests {
 }
 
 impl Draw for Stencil {
+    fn get_dimensions(&self) -> Point {
+        self.dimensions
+    }
+
     /// Draw a filled rectangle with the given pattern.
     fn filled_rectangle(&mut self, upper_left: Point, lower_right: Point, pattern: &[u8; 8]) {
         let (upper_left, lower_right) = canonize_rectangle(upper_left, lower_right);
