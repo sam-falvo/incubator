@@ -13,7 +13,7 @@ use sdl2::libc;
 use sdl2::mouse::MouseButton;
 use sdlstate::SdlState;
 
-use app::{demo_init, demo_tick};
+use app::demo_init;
 
 const W: Dimension = 320;
 const H: Dimension = 200;
@@ -25,7 +25,7 @@ const H: Dimension = 200;
 /// events, mouse movement events, and so forth.
 ///
 /// From this event loop's perspective, the entire environment is comprised of just two functions:
-/// [[demo_init]] and [[demo_tick]].  The former is responsible for configuring the application
+/// [[demo_init]] and [[ClockState::demo_tick]].  The former is responsible for configuring the application
 /// environment, including painting the initial desktop environment.  The latter is responsible for
 /// handling subsequent events.
 ///
@@ -71,7 +71,7 @@ fn main() {
     // Enter the main loop for the clock.
     // We start by initializing the clock.
     // Then, delegate to the timer's event handler for every event we receive.
-    demo_init(&mut desktop);
+    let mut clock_state = demo_init(&mut desktop);
     'main_event_loop: loop {
         for event in event_pump.wait_iter() {
             let command = match event {
@@ -81,7 +81,7 @@ fn main() {
                 }
                 Event::MouseButtonUp {
                     mouse_btn: b, x, y, ..
-                } => demo_tick(
+                } => clock_state.demo_tick(
                     &mut desktop,
                     Cmd::ButtonUp {
                         button: button_for(b),
@@ -90,7 +90,7 @@ fn main() {
                 ),
                 Event::MouseButtonDown {
                     mouse_btn: b, x, y, ..
-                } => demo_tick(
+                } => clock_state.demo_tick(
                     &mut desktop,
                     Cmd::ButtonDown {
                         button: button_for(b),
@@ -98,7 +98,7 @@ fn main() {
                     },
                 ),
                 Event::User { type_: t, .. } if t == timer_tick => {
-                    demo_tick(&mut desktop, Cmd::TimerTick)
+                    clock_state.demo_tick(&mut desktop, Cmd::TimerTick)
                 }
                 _ => HostAction::None,
             };
@@ -116,8 +116,8 @@ fn main() {
 fn button_for(b: MouseButton) -> usize {
     match b {
         MouseButton::Left => 1,
-        MouseButton::Middle => 2,
-        MouseButton::Right => 3,
+        MouseButton::Right => 2,
+        MouseButton::Middle => 3,
         _ => 0,
     }
 }
