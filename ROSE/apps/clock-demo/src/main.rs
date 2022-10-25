@@ -18,32 +18,6 @@ use app::{demo_init, demo_tick};
 const W: Dimension = 320;
 const H: Dimension = 200;
 
-/// Repaint the screen and make it visible to the human operator.
-///
-/// This function performs color-expansion and/or retiling as appropriate to render the contents of
-/// the `desktop` stencil to the display.
-fn repaint(desktop: &mut Stencil, sdl: &mut SdlState) {
-    // Sadly, because of how SDL2 works with modern video equipment,
-    // we must refresh the entire surface; we can't be clever and just
-    // refresh a subset of a surface.  Therefore, the `r` parameter is
-    // unused.
-    let ((left, top), (right, bottom)) = ((0, 0), desktop.dimensions);
-    let (left, top) = (left as usize, top as usize);
-    let (right, bottom) = (right as usize, bottom as usize);
-    let width = right - left;
-    let height = bottom - top;
-
-    sdl.paint_with(|ctx| {
-        ctx.paste_stamp_be(
-            (left, top),
-            (width, height),
-            desktop.get_span(),
-            (left, top),
-            desktop.borrow_bits(),
-        );
-    });
-}
-
 /// The main entry point is ultimately responsible for driving the entire application environment.
 /// It creates the SDL (or other platform-specific) frame buffer surface on which we ultimately
 /// render our desktop environment.  It then integrates with the SDL (or platform-specific) event
@@ -102,7 +76,6 @@ fn main() {
     let mut command = demo_init(&mut desktop);
     while !done {
         match command {
-            Cmd::Nop => (),
             Cmd::Quit => done = true,
             Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
             Cmd::WaitEvent => {
@@ -115,7 +88,7 @@ fn main() {
                             if we == WindowEvent::Exposed {
                                 repaint(&mut desktop, &mut sdl)
                             }
-                            Cmd::Nop
+                            Cmd::WaitEvent
                         }
                         Event::MouseButtonUp {
                             mouse_btn: b, x, y, ..
@@ -130,10 +103,10 @@ fn main() {
                             at: (x as Unit, y as Unit),
                         },
                         Event::User { type_: t, .. } if t == timer_tick => Cmd::TimerTick,
-                        _ => Cmd::Nop,
+                        _ => Cmd::WaitEvent
                     }
                 } else {
-                    Cmd::Nop
+                    Cmd::WaitEvent
                 }
             }
             _ => command = Cmd::WaitEvent,
@@ -153,7 +126,6 @@ fn button_for(b: MouseButton) -> usize {
 }
 
 pub enum Cmd {
-    Nop,
     Quit,
     Repaint(Rect),
     WaitEvent,
@@ -161,3 +133,30 @@ pub enum Cmd {
     ButtonDown { button: usize, at: Point },
     TimerTick,
 }
+
+/// Repaint the screen and make it visible to the human operator.
+///
+/// This function performs color-expansion and/or retiling as appropriate to render the contents of
+/// the `desktop` stencil to the display.
+fn repaint(desktop: &mut Stencil, sdl: &mut SdlState) {
+    // Sadly, because of how SDL2 works with modern video equipment,
+    // we must refresh the entire surface; we can't be clever and just
+    // refresh a subset of a surface.  Therefore, the `r` parameter is
+    // unused.
+    let ((left, top), (right, bottom)) = ((0, 0), desktop.dimensions);
+    let (left, top) = (left as usize, top as usize);
+    let (right, bottom) = (right as usize, bottom as usize);
+    let width = right - left;
+    let height = bottom - top;
+
+    sdl.paint_with(|ctx| {
+        ctx.paste_stamp_be(
+            (left, top),
+            (width, height),
+            desktop.get_span(),
+            (left, top),
+            desktop.borrow_bits(),
+        );
+    });
+}
+
