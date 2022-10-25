@@ -20,6 +20,9 @@ pub struct SimplePrinter<'a, 'b> {
     /// The location of the current print "head".  Note that this locates the
     /// *baseline*, not the top-left corner of the next glyph.
     pub head: Point,
+
+    /// The blitter operation to perform when pasting glyphs to the stencil.
+    pub blit_op: BlitOp,
 }
 
 impl<'a, 'b> SimplePrinter<'a, 'b> {
@@ -33,7 +36,9 @@ impl<'a, 'b> SimplePrinter<'a, 'b> {
     /// The `font` indicates the font the printer will use for printing.
     ///
     /// After creation, the print head will be placed in the upper left-hand corner of the margins
-    /// rectangle.
+    /// rectangle.  The default `blit_op` will be set to render black text on a white surface,
+    /// which is usually correct.  If a different blitter operation is required, `blit_op` may be
+    /// adjusted prior to the next print.
     pub fn new(stencil: &'a mut Stencil, margins: Rect, font: &'b SimpleBitmapFont<'b>) -> Self {
         let (left, top) = (margins.0.0, margins.0.1 + font.baseline);
 
@@ -43,6 +48,7 @@ impl<'a, 'b> SimplePrinter<'a, 'b> {
             font,
 
             head: (left, top),
+            blit_op: BlitOp::DandNotS,
         }
     }
 
@@ -126,7 +132,7 @@ impl Printer for SimplePrinter<'_, '_> {
         }
 
         let glyph_bottom = self.head.1 - self.font.baseline + self.font.height;
-        if glyph_bottom >= self.margins.1.1 {
+        if glyph_bottom > self.margins.1.1 {
             // Bottom of glyph falls below bottom of the margin bottom.
             return;
         }
@@ -172,7 +178,7 @@ impl Printer for SimplePrinter<'_, '_> {
             self.font.height as usize,
             x as usize,
             top,
-            BlitOp::DandNotS,
+            self.blit_op,
         );
 
         self.head.0 = new_cursor_position;

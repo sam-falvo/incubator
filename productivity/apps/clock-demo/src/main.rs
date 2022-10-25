@@ -1,5 +1,4 @@
 mod app;
-mod text;
 
 extern crate chrono;
 extern crate sdl2;

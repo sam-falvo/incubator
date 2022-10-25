@@ -1,11 +1,11 @@
-use crate::text::paint_text;
 use crate::Cmd;
 use bitblt::{blit_rect, BlitContext, BlitOp};
 use chrono::prelude::{DateTime, Local};
 use stencil::stencil::{Draw, Stencil};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
-use stencil::types::Point;
+use stencil::types::{Point, Unit, Rect};
 use stencil::utils::{WHITE_PATTERN, draw_dialog_box, draw_desktop};
+use stencil::printer::{SimplePrinter, Printer};
 
 /// A monochrome bitmap of the application close gadget.
 /// Although only 12x10 pixels, it's arranged as a 24x10 bitmap
@@ -37,17 +37,11 @@ pub fn demo_init(desktop: &mut Stencil) -> Cmd {
     }
     desktop.horizontal_line((80, 62), 240, 0x00);
 
-    let font = SYSTEM_BITMAP_FONT;
-    let op = BlitOp::Xor;
-    let _ = paint_text(
-        desktop,
-        op,
-        &font,
-        98,
-        52 + font.baseline,
-        "<-- Click to close",
-    )
-    .unwrap();
+    {
+        let font = &SYSTEM_BITMAP_FONT;
+        let mut printer = SimplePrinter::new(desktop, ((96, 52), (238, 52+font.height)), font);
+        printer.print("<-- Click to close");
+    }
 
     Cmd::Repaint(((0, 0), (w, h)))
 }
@@ -81,50 +75,36 @@ fn redraw_time(desktop: &mut Stencil) -> Cmd {
     let time_string_1 = format!("{}", dt.format("%H:%M"));
     let time_string_2 = format!("{}", dt.format(":%S"));
     let font = &SYSTEM_BITMAP_FONT;
-    let y = 100 + font.baseline;
+    let label_region: Rect = ((160, 100), (230, 120));
 
-    // Erase the old time pattern.  70px x 20px ought to be enough for anyone.
-
-    desktop.filled_rectangle((160, 100), (230, 120), &WHITE_PATTERN);
+    // Erase the old time pattern.
+    desktop.filled_rectangle(label_region.0, label_region.1, &WHITE_PATTERN);
 
     // Print the time string, but do so in a way that lets us capture where the seconds colon sits
     // on the screen.
+    let xcolon: Unit;
+    let xmax: Unit;
+    {
+        let mut printer = SimplePrinter::new(desktop, label_region, &font);
+        printer.print(&time_string_1);
+        xcolon = printer.head.0;
 
-    let xcolon = paint_text(
-        desktop,
-        BlitOp::Xor,
-        font,
-        160,
-        y,
-        &time_string_1,
-    ).unwrap();
-
-    let xmax = paint_text(
-        desktop,
-        BlitOp::Xor,
-        font,
-        xcolon,
-        y,
-        &time_string_2,
-    ).unwrap();
+        printer.print(&time_string_2);
+        xmax = printer.head.0;
+    }
 
     // Now, if we need to hide the colon, use the XOR operator to remove it.
-
     unsafe {
         HIDE_COLON = !HIDE_COLON;
         if HIDE_COLON {
-            let _ = paint_text(
-                desktop,
-                BlitOp::Xor,
-                font,
-                xcolon,
-                y,
-                ":"
-            ).unwrap();
+            let mut printer = SimplePrinter::new(desktop, label_region, &font);
+            printer.blit_op = BlitOp::Xor;
+            printer.head.0 = xcolon;
+            printer.print(":");
         }
     }
 
     // Tell event loop to commit changes to the desktop.
 
-    Cmd::Repaint(((160, 100), (xmax, 100 + font.height)))
+    Cmd::Repaint((label_region.0, (xmax, 100 + font.height)))
 }
