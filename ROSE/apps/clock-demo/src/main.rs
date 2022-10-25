@@ -42,7 +42,6 @@ fn main() {
 
     // Gain access to our event queue.
     let mut event_pump = sdl.context.event_pump().unwrap();
-    let mut event_iter = event_pump.wait_iter();
 
     // Create a 500ms timer that generates a TimerTick event when it fires.
     //
@@ -72,45 +71,34 @@ fn main() {
     // Enter the main loop for the clock.
     // We start by initializing the clock.
     // Then, delegate to the timer's event handler for every event we receive.
-    let mut command = demo_init(&mut desktop);
+    demo_init(&mut desktop);
     'main_event_loop: loop {
-        match command {
-            Cmd::Quit => break 'main_event_loop,
-            Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
-            Cmd::WaitEvent => {
-                let event = event_iter.next();
+        for event in event_pump.wait_iter() {
+            let command = match event {
+                Event::Quit { .. } => Cmd::Quit,
+                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => Cmd::Repaint(((0, 0), (W, H))),
+                Event::MouseButtonUp {
+                    mouse_btn: b, x, y, ..
+                } => demo_tick(&mut desktop, Cmd::ButtonUp {
+                    button: button_for(b),
+                    at: (x as Unit, y as Unit),
+                }),
+                Event::MouseButtonDown {
+                    mouse_btn: b, x, y, ..
+                } => demo_tick(&mut desktop, Cmd::ButtonDown {
+                    button: button_for(b),
+                    at: (x as Unit, y as Unit),
+                }),
+                Event::User { type_: t, .. } if t == timer_tick => demo_tick(&mut desktop, Cmd::TimerTick),
+                _ => Cmd::None,
+            };
 
-                command = if let Some(e) = event {
-                    match e {
-                        Event::Quit { .. } => Cmd::Quit,
-                        Event::Window { win_event: we, .. } => {
-                            if we == WindowEvent::Exposed {
-                                repaint(&mut desktop, &mut sdl)
-                            }
-                            Cmd::WaitEvent
-                        }
-                        Event::MouseButtonUp {
-                            mouse_btn: b, x, y, ..
-                        } => Cmd::ButtonUp {
-                            button: button_for(b),
-                            at: (x as Unit, y as Unit),
-                        },
-                        Event::MouseButtonDown {
-                            mouse_btn: b, x, y, ..
-                        } => Cmd::ButtonDown {
-                            button: button_for(b),
-                            at: (x as Unit, y as Unit),
-                        },
-                        Event::User { type_: t, .. } if t == timer_tick => Cmd::TimerTick,
-                        _ => Cmd::WaitEvent
-                    }
-                } else {
-                    Cmd::WaitEvent
-                }
+            match command {
+                Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
+                Cmd::Quit => break 'main_event_loop,
+                _ => (),
             }
-            _ => command = Cmd::WaitEvent,
-        };
-        command = demo_tick(&mut desktop, command);
+        }
     }
 }
 
@@ -125,6 +113,7 @@ fn button_for(b: MouseButton) -> usize {
 }
 
 pub enum Cmd {
+    None,
     Quit,
     Repaint(Rect),
     WaitEvent,
