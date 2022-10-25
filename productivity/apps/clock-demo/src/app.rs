@@ -29,7 +29,7 @@ pub fn demo_init(desktop: &mut Stencil) -> Cmd {
     let (w, h) = desktop.dimensions;
 
     draw_desktop(desktop);
-    draw_dialog_box(desktop, 80, 50, 240, 150);
+    draw_dialog_box(desktop, ((80, 50), (240, 150)));
     {
         // to scope a mutable borrow
         let mut bc = BlitContext::new(&CLOSE_BITMAP, 3, &mut desktop.bits, (w >> 3) as usize);

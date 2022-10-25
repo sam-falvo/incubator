@@ -1,9 +1,6 @@
-//! Useful utilities that are frequently used.
-//!
-//! This module contains functionality that is hard to categorize more precisely, but which remains
-//! a useful toolbox for application developers.
+//! Useful tools that are frequently used, but which don't really fit anywhere else.
 
-use crate::types::Unit;
+use crate::types::Rect;
 use crate::stencil::{Draw, Pattern};
 
 /// The default desktop background pattern (a 50% grey stipple).
@@ -17,18 +14,23 @@ pub static WHITE_PATTERN: Pattern = [255, 255, 255, 255, 255, 255, 255, 255];
 
 
 /// Draws the background for a desktop environment.
-pub fn draw_desktop(st: &mut impl Draw) {
+///
+/// Currently, this function fills the entire stencil with the DESKTOP_PATTERN.
+pub fn draw_desktop(st: &mut dyn Draw) {
     st.filled_rectangle((0, 0), st.get_dimensions(), &DESKTOP_PATTERN);
 }
 
 /// Draws a simple dialog box onto the provided stencil.
+///
+/// The `paper` parameter specifies the rectangle of the dialog's "paper" surface.  Any borders to
+/// the dialog box will be drawn *around* this rectangle, clipped as appropriate.  This allows a
+/// dialog to cover the full stencil surface if required.
 pub fn draw_dialog_box(
-    st: &mut impl Draw,
-    paper_left: Unit,
-    paper_top: Unit,
-    paper_right: Unit,
-    paper_bottom: Unit,
+    st: &mut dyn Draw,
+    paper: Rect,
 ) {
+    let ((paper_left, paper_top), (paper_right, paper_bottom)) = paper;
+
     let border_left = paper_left - 1;
     let border_top = paper_top - 1;
     let border_right = paper_right + 1;

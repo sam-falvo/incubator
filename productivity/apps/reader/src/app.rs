@@ -44,7 +44,7 @@ impl Initializable for Reader {
         let font = SYSTEM_BITMAP_FONT;
 
         draw_desktop(desktop);
-        draw_dialog_box(desktop, 8, 8, width - 8, height - 8);
+        draw_dialog_box(desktop, ((8, 8), (width - 8, height - 8)));
 
         let file_contents = fs::read_to_string("lorem-ipsum.txt");
         match file_contents {
