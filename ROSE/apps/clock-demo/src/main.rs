@@ -72,11 +72,10 @@ fn main() {
     // Enter the main loop for the clock.
     // We start by initializing the clock.
     // Then, delegate to the timer's event handler for every event we receive.
-    let mut done = false;
     let mut command = demo_init(&mut desktop);
-    while !done {
+    'main_event_loop: loop {
         match command {
-            Cmd::Quit => done = true,
+            Cmd::Quit => break 'main_event_loop,
             Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
             Cmd::WaitEvent => {
                 let event = event_iter.next();
