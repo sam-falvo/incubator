@@ -76,20 +76,30 @@ fn main() {
         for event in event_pump.wait_iter() {
             let command = match event {
                 Event::Quit { .. } => Cmd::Quit,
-                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => Cmd::Repaint(((0, 0), (W, H))),
+                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => {
+                    Cmd::Repaint(((0, 0), (W, H)))
+                }
                 Event::MouseButtonUp {
                     mouse_btn: b, x, y, ..
-                } => demo_tick(&mut desktop, Cmd::ButtonUp {
-                    button: button_for(b),
-                    at: (x as Unit, y as Unit),
-                }),
+                } => demo_tick(
+                    &mut desktop,
+                    Cmd::ButtonUp {
+                        button: button_for(b),
+                        at: (x as Unit, y as Unit),
+                    },
+                ),
                 Event::MouseButtonDown {
                     mouse_btn: b, x, y, ..
-                } => demo_tick(&mut desktop, Cmd::ButtonDown {
-                    button: button_for(b),
-                    at: (x as Unit, y as Unit),
-                }),
-                Event::User { type_: t, .. } if t == timer_tick => demo_tick(&mut desktop, Cmd::TimerTick),
+                } => demo_tick(
+                    &mut desktop,
+                    Cmd::ButtonDown {
+                        button: button_for(b),
+                        at: (x as Unit, y as Unit),
+                    },
+                ),
+                Event::User { type_: t, .. } if t == timer_tick => {
+                    demo_tick(&mut desktop, Cmd::TimerTick)
+                }
                 _ => Cmd::None,
             };
 
@@ -147,4 +157,3 @@ fn repaint(desktop: &mut Stencil, sdl: &mut SdlState) {
         );
     });
 }
-

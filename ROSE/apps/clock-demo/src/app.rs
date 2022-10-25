@@ -1,11 +1,11 @@
 use crate::Cmd;
 use bitblt::{blit_rect, BlitContext, BlitOp};
 use chrono::prelude::{DateTime, Local};
+use stencil::printer::{Printer, SimplePrinter};
 use stencil::stencil::{Draw, Stencil};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
-use stencil::types::{Point, Unit, Rect};
-use stencil::utils::{WHITE_PATTERN, draw_dialog_box, draw_desktop};
-use stencil::printer::{SimplePrinter, Printer};
+use stencil::types::{Point, Rect, Unit};
+use stencil::utils::{draw_desktop, draw_dialog_box, WHITE_PATTERN};
 
 /// A monochrome bitmap of the application close gadget.
 /// Although only 12x10 pixels, it's arranged as a 24x10 bitmap
@@ -39,7 +39,7 @@ pub fn demo_init(desktop: &mut Stencil) -> Cmd {
 
     {
         let font = &SYSTEM_BITMAP_FONT;
-        let mut printer = SimplePrinter::new(desktop, ((96, 52), (238, 52+font.height)), font);
+        let mut printer = SimplePrinter::new(desktop, ((96, 52), (238, 52 + font.height)), font);
         printer.print("<-- Click to close");
     }
 
