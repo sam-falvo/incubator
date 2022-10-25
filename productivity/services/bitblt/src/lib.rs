@@ -473,7 +473,7 @@ pub fn blit_line_descending(bc: &mut BlitContext, width: usize) {
 /// Thus, a one-pixel sub-rectangle is described using coordinates (L, T)-(L+1, T+1).
 ///
 /// The [[BlitContext]]'s `s_data` field should be initialized with a value that supplies data bits
-/// when shifting the first source byte in each line.  The [[new]] function sets this field to 0,
+/// when shifting the first source byte in each line.  The [[BlitContext::new]] function sets this field to 0,
 /// which is almost always correct.  Note: Whether this data supplies bits for the left-hand or
 /// right-hand edges depends whether the blit operation occurs in ascending (left-hand edge) or
 /// descending (right-hand edge) mode.
@@ -497,7 +497,7 @@ pub fn blit_rect(
     perform_blit_rect(bc, width_in_bytes, height, ascending_mode);
 }
 
-/// Configures a [[BlitRect]] structure for a rectangular blit operation.
+/// Configures a [[BlitContext]] structure for a rectangular blit operation.
 ///
 /// You generally won't be needing this function; it's intended purpose is to facilitate unit
 /// testing.

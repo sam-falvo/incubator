@@ -1,7 +1,17 @@
 [package]
 name = "stencil"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+description = "Monochrome bitmap drawing library suitable for simple UIs"
+license = "GPLv3"
+authors = ["Samuel A. Falvo II <kc5tja@arrl.net>"]
+keywords = ["GUI", "UI", "interface", "graphics", "api"]
+readme = "README.md"
+
+#resolver = "2"
+#categories = ["rendering","api-bindings","game-engines","multimedia"]
+#repository = "https://github.com/Rust-SDL2/rust-sdl2"
+#documentation = "https://rust-sdl2.github.io/rust-sdl2/sdl2/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
