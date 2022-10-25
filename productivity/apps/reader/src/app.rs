@@ -1,7 +1,7 @@
 use bitblt::{BlitOp, BlitContext, blit_rect};
 
 use std::fs;
-use std::cell::Cell;
+use std::cell::RefCell;
 
 use stencil::types::{Point, Rect, Unit};
 use stencil::stencil::{Draw, Stencil};
@@ -10,13 +10,28 @@ use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 
 pub struct Reader {
-    text_to_view: Cell<Option<String>>,
+    text_to_view: RefCell<Option<String>>,
 }
 
 impl Reader {
     pub fn new() -> Self {
         Reader{
-            text_to_view: Cell::new(None),
+            text_to_view: RefCell::new(None),
+        }
+    }
+
+    pub fn print_file(&self, desktop: &mut Stencil, font: &SimpleBitmapFont) {
+        let maybe_contents = self.text_to_view.replace(None);
+
+        match maybe_contents {
+            Some(text) => {
+                let (width, height) = desktop.get_dimensions();
+                let mut printer = SimplePrinter::new(desktop, ((10, 10), (width - 10, height - 10)), &font);
+                printer.print(&text);
+                self.text_to_view.replace(Some(text));
+            },
+
+            _ => (),
         }
     }
 }
@@ -33,23 +48,16 @@ impl Initializable for Reader {
         draw_desktop(desktop);
         draw_dialog_box(desktop, 8, 8, width - 8, height - 8);
 
-        let file_contents = fs::read_to_string("Lorem-ipsum.txt");
+        let file_contents = fs::read_to_string("lorem-ipsum.txt");
         match file_contents {
             Err(e) => {
                 let error_reason = format!("Could not open lorem-ipsum.txt because: {}", e);
-
-                { // to scope a mutable borrow.
-                    let mut printer = SimplePrinter::new(
-                        desktop,
-                        ((10, 10), (width-10, height-10)),
-                        &font,
-                    );
-
-                    printer.print(&error_reason);
-                }
+                let mut printer = SimplePrinter::new(desktop, ((10, 10), (width - 10, height - 10)), &font);
+                printer.print(&error_reason);
             },
             Ok(contents) => {
                 self.text_to_view.replace(Some(contents));
+                self.print_file(desktop, &font);
             }
         }
     }
@@ -149,10 +157,16 @@ impl Printable for SimplePrinter<'_, '_> {
         // completely.  If not, defer to a callback, which may or may not
         // re-enter print_byte.
         let (x, y) = self.head;
-        let stencil_width = self.stencil.dimensions.0;
         let new_cursor_position = x + glyph_width as Unit;
-        if new_cursor_position > stencil_width {
+        let right_hand_margin = self.margins.1.0;
+        if new_cursor_position >= right_hand_margin {
             self.line_wrap(b);
+            return;
+        }
+
+        let glyph_bottom = self.head.1 - self.font.baseline + self.font.height;
+        if glyph_bottom >= self.margins.1.1 {
+            // Bottom of glyph falls below bottom of the margin bottom.
             return;
         }
 
@@ -184,6 +198,7 @@ impl Printable for SimplePrinter<'_, '_> {
         bc.s_bits = &(*bc.d_bits);
         bc.s_span = 3;
 
+        let stencil_width = self.stencil.dimensions.0;
         bc.d_bits = &mut self.stencil.bits;
         bc.d_span = ((stencil_width + 7) >> 3) as usize;
 
