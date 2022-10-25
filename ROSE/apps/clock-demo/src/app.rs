@@ -1,4 +1,5 @@
 use crate::Cmd;
+use crate::HostAction;
 use bitblt::{blit_rect, BlitContext, BlitOp};
 use chrono::prelude::{DateTime, Local};
 use stencil::printer::{Printer, SimplePrinter};
@@ -25,14 +26,14 @@ static CLOSE_BITMAP: [u8; 30] = [
 ];
 
 /// Configure the initial state of the clock application.
-pub fn demo_init(desktop: &mut Stencil) -> Cmd {
-    let (w, h) = desktop.dimensions;
+pub fn demo_init(desktop: &mut Stencil) {
+    let width = desktop.dimensions.0;
 
     draw_desktop(desktop);
     draw_dialog_box(desktop, ((80, 50), (240, 150)));
     {
         // to scope a mutable borrow
-        let mut bc = BlitContext::new(&CLOSE_BITMAP, 3, &mut desktop.bits, (w >> 3) as usize);
+        let mut bc = BlitContext::new(&CLOSE_BITMAP, 3, &mut desktop.bits, (width >> 3) as usize);
         blit_rect(&mut bc, 0, 0, 12, 10, 81, 51, BlitOp::DandNotS);
     }
     desktop.horizontal_line((80, 62), 240, 0x00);
@@ -42,23 +43,20 @@ pub fn demo_init(desktop: &mut Stencil) -> Cmd {
         let mut printer = SimplePrinter::new(desktop, ((96, 52), (238, 52 + font.height)), font);
         printer.print("<-- Click to close");
     }
-
-    Cmd::Repaint(((0, 0), (w, h)))
 }
 
 /// Process input events for the clock application.
-pub fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> Cmd {
+pub fn demo_tick(desktop: &mut Stencil, previous: Cmd) -> HostAction {
     match previous {
-        Cmd::Quit => previous,
         Cmd::ButtonUp { at: point, .. } => {
             if clicked_in_close_gadget(point) {
-                Cmd::Quit
+                HostAction::Quit
             } else {
-                Cmd::WaitEvent
+                HostAction::None
             }
         }
         Cmd::TimerTick => redraw_time(desktop),
-        _ => Cmd::WaitEvent,
+        _ => HostAction::None,
     }
 }
 
@@ -70,7 +68,7 @@ fn clicked_in_close_gadget(point: Point) -> bool {
 static mut HIDE_COLON: bool = false;
 
 /// Redraw the current time
-fn redraw_time(desktop: &mut Stencil) -> Cmd {
+fn redraw_time(desktop: &mut Stencil) -> HostAction {
     let dt: DateTime<Local> = Local::now();
     let time_string_1 = format!("{}", dt.format("%H:%M"));
     let time_string_2 = format!("{}", dt.format(":%S"));
@@ -106,5 +104,5 @@ fn redraw_time(desktop: &mut Stencil) -> Cmd {
 
     // Tell event loop to commit changes to the desktop.
 
-    Cmd::Repaint((label_region.0, (xmax, 100 + font.height)))
+    HostAction::Repaint((label_region.0, (xmax, 100 + font.height)))
 }

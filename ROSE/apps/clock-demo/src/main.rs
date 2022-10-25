@@ -75,9 +75,9 @@ fn main() {
     'main_event_loop: loop {
         for event in event_pump.wait_iter() {
             let command = match event {
-                Event::Quit { .. } => Cmd::Quit,
+                Event::Quit { .. } => HostAction::Quit,
                 Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => {
-                    Cmd::Repaint(((0, 0), (W, H)))
+                    HostAction::Repaint(((0, 0), (W, H)))
                 }
                 Event::MouseButtonUp {
                     mouse_btn: b, x, y, ..
@@ -100,12 +100,12 @@ fn main() {
                 Event::User { type_: t, .. } if t == timer_tick => {
                     demo_tick(&mut desktop, Cmd::TimerTick)
                 }
-                _ => Cmd::None,
+                _ => HostAction::None,
             };
 
             match command {
-                Cmd::Repaint(_) => repaint(&mut desktop, &mut sdl),
-                Cmd::Quit => break 'main_event_loop,
+                HostAction::Repaint(_) => repaint(&mut desktop, &mut sdl),
+                HostAction::Quit => break 'main_event_loop,
                 _ => (),
             }
         }
@@ -122,10 +122,13 @@ fn button_for(b: MouseButton) -> usize {
     }
 }
 
-pub enum Cmd {
+pub enum HostAction {
     None,
     Quit,
     Repaint(Rect),
+}
+
+pub enum Cmd {
     WaitEvent,
     ButtonUp { button: usize, at: Point },
     ButtonDown { button: usize, at: Point },
