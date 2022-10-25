@@ -1,3 +1,53 @@
+# 2022-10-25
+
+I just had a flash of inspiration.
+I've long been looking for a good name for my graphical environment projects.
+I've finally settled on one.
+
+As of today,
+this project will henceforth be known as ROSE,
+the Retro-inspired Operating System Environment.
+It is, to some extent, a pun on the name GEOS.
+And, while running under a hosted OS, it's clearly not an OS unto itself,
+there's little (if anything?) preventing it from being hosted on bare metal.
+
+For fun,
+I am entertaining the idea of naming a word processor for it AmbROSE.
+If anyone asks,
+I'll just say that I named it after Ambrose Bierce.
+
+I haven't decided if it's time to graduate the project to a self-standing repository yet.
+
+# 2022-10-24
+
+Working on apps and system services together has yielded a graphics API that I quite enjoy using.
+In particular, I am especially chuffed with the API for printing text to a stencil (bitmap).
+
+```rust
+let mut p = SimplePrinter::new(
+	&mut stencil,
+	((L, T), (R, B)),
+	&font
+);
+p.print(&a_string);
+```
+
+Seems like a simple thing,
+but this properly wraps text around the righthand margin
+and stops printing if the text falls off the bottom edge.
+This is literally the API I've *always* wanted for every GUI environment I've coded for.
+The *only* one which seems to implement anything like this is GEOS for the Commodore 64.
+(Not sure about PC/GEOS; considering its lineage, though, I suspect it did.)
+
+This is plenty good enough for the task of creating a slide deck player.
+However, it's not good enough for a general purpose text reader or editor yet.
+I will need to support word-wrapping at the very least,
+and eventually, support for multiple fonts and styles.
+
+But if all you're doing is throwing up a dialog box or rendering a menu or status line,
+SimplePrinter is your go-to API.
+Nothing else is simpler.
+
 # 2022-09-30
 
 This directory holds programs which explore the idea of building productivity tools.
