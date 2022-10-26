@@ -78,20 +78,10 @@ impl<'a, 'b> SimplePrinter<'a, 'b> {
             _ => self.print_byte(b),
         }
     }
-}
 
-/// All printer-compatible types can implement this trait.
-pub trait Printer {
     /// Print a `text` string.  The layout of the text will depend on the specific printer you're
     /// using.
-    fn print(&mut self, text: &str);
-
-    /// Print a single byte `b`, handling only simple control codes like carriage return, etc.
-    fn print_byte(&mut self, b: u8);
-}
-
-impl Printer for SimplePrinter<'_, '_> {
-    fn print(&mut self, text: &str) {
+    pub fn print(&mut self, text: &str) {
         let mut text_iter = text.bytes();
         loop {
             let some_b = text_iter.next();
@@ -102,7 +92,8 @@ impl Printer for SimplePrinter<'_, '_> {
         }
     }
 
-    fn print_byte(&mut self, b: u8) {
+    /// Print a single byte `b`, handling only simple control codes like carriage return, etc.
+    pub fn print_byte(&mut self, b: u8) {
         // If not representable in the glyph set of the font, assume the undefined character glyph,
         // which by definition, is always at highest_char+1 mod 256.
         let highest_character = self.font.highest_char;

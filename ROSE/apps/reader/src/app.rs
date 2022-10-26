@@ -5,7 +5,7 @@ use stencil::stencil::{Draw, Stencil};
 use stencil::utils::{ draw_desktop, draw_dialog_box };
 use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
-use stencil::printer::{SimplePrinter, Printer};
+use stencil::simple_printer::SimplePrinter;
 
 pub struct Reader {
     text_to_view: RefCell<Option<String>>,

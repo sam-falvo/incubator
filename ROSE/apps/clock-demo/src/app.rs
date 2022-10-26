@@ -3,7 +3,7 @@ use crate::{Cmd, HostAction};
 
 use bitblt::{blit_rect, BlitContext, BlitOp};
 use chrono::prelude::{DateTime, Local};
-use stencil::printer::{Printer, SimplePrinter};
+use stencil::simple_printer::SimplePrinter;
 use stencil::stencil::{Draw, Stencil};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::types::{Point, Rect, Unit};
