@@ -54,7 +54,7 @@ impl Initializable for Reader {
         let prop_left = text_right + 2;
         let prop_top = top;
         let prop_right = right;
-        let prop_bottom = bottom;
+        let prop_bottom = bottom - 32;
 
         draw_desktop(desktop);
         draw_dialog_box(desktop, (topleft, bottomright));
@@ -72,10 +72,42 @@ impl Initializable for Reader {
             }
         }
 
+        use bitblt::{BlitContext, BlitOp, blit_rect};
         draw_prop_gadget(desktop, ((prop_left, prop_top), (prop_right, prop_bottom)));
+        desktop.framed_rectangle((prop_left, prop_bottom), (prop_right, prop_bottom+16), LINE_BLACK);
+        desktop.framed_rectangle((prop_left, prop_bottom+16), (prop_right, prop_bottom+32), LINE_BLACK);
+        {
+            let mut bc = BlitContext::new(&arrow_bits_up, 2, &mut desktop.bits, (width >> 3) as usize);
+            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (prop_bottom + 4) as usize, BlitOp::DandNotS);
+        }
+        {
+            let mut bc = BlitContext::new(&arrow_bits_dn, 2, &mut desktop.bits, (width >> 3) as usize);
+            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (prop_bottom + 20) as usize, BlitOp::DandNotS);
+        }
     }
 }
 
+static arrow_bits_up: [u8; 16] = [
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+    0b00111100, 0b00000000,
+    0b00111100, 0b00000000,
+    0b01111110, 0b00000000,
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+];
+
+static arrow_bits_dn: [u8; 16] = [
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+    0b01111110, 0b00000000,
+    0b00111100, 0b00000000,
+    0b00111100, 0b00000000,
+    0b00011000, 0b00000000,
+    0b00011000, 0b00000000,
+];
 
 static SLIDER_PATTERN: [u8; 8] = [
     0b00010001,
