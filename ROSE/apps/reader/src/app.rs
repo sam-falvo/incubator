@@ -6,6 +6,8 @@ use stencil::utils::{ draw_desktop, draw_dialog_box };
 use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::simple_printer::SimplePrinter;
+use stencil::types::Rect;
+use stencil::utils::{WHITE_PATTERN, BLACK_PATTERN, LINE_BLACK};
 
 pub struct Reader {
     text_to_view: RefCell<Option<String>>,
@@ -43,14 +45,25 @@ impl Initializable for Reader {
         let (width, height) = desktop.get_dimensions();
         let font = SYSTEM_BITMAP_FONT;
 
+        let (left, top) = (8, 8);
+        let (right, bottom) = (width - 8, height - 8);
+        let topleft = (left, top);
+        let bottomright = (right, bottom);
+
+        let text_right = right - 18;
+        let prop_left = text_right + 2;
+        let prop_top = top;
+        let prop_right = right;
+        let prop_bottom = bottom;
+
         draw_desktop(desktop);
-        draw_dialog_box(desktop, ((8, 8), (width - 8, height - 8)));
+        draw_dialog_box(desktop, (topleft, bottomright));
 
         let file_contents = fs::read_to_string("lorem-ipsum.txt");
         match file_contents {
             Err(e) => {
                 let error_reason = format!("Could not open lorem-ipsum.txt because: {}", e);
-                let mut printer = SimplePrinter::new(desktop, ((10, 10), (width - 10, height - 10)), &font);
+                let mut printer = SimplePrinter::new(desktop, ((10, 10), (text_right, height - 10)), &font);
                 printer.print(&error_reason);
             },
             Ok(contents) => {
@@ -58,6 +71,40 @@ impl Initializable for Reader {
                 self.print_file(desktop, &font);
             }
         }
+
+        draw_prop_gadget(desktop, ((prop_left, prop_top), (prop_right, prop_bottom)));
     }
+}
+
+
+static SLIDER_PATTERN: [u8; 8] = [
+    0b00010001,
+    0b01000100,
+    0b00010001,
+    0b01000100,
+    0b00010001,
+    0b01000100,
+    0b00010001,
+    0b01000100,
+];
+
+fn draw_prop_gadget(desktop: &mut Stencil, area: Rect) {
+    let slider_topleft = area.0;
+    let slider_bottomright = area.1;
+    let (slider_left, slider_top) = slider_topleft;
+    let (slider_right, slider_bottom) = slider_bottomright;
+
+    desktop.filled_rectangle(slider_topleft, slider_bottomright, &SLIDER_PATTERN);
+    desktop.vertical_line(slider_topleft, slider_bottom, LINE_BLACK);
+
+    let knob_left = slider_left + 2;
+    let knob_right = slider_right - 1;
+    let knob_top = slider_top + 2;
+    let knob_bottom = (slider_top + slider_bottom) >> 1;
+    let knob_topleft = (knob_left, knob_top);
+    let knob_bottomright = (knob_right, knob_bottom);
+
+    desktop.filled_rectangle(knob_topleft, knob_bottomright, &WHITE_PATTERN);
+    desktop.framed_rectangle(knob_topleft, knob_bottomright, LINE_BLACK);
 }
 
