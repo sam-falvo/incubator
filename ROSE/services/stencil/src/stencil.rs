@@ -73,6 +73,14 @@ pub trait Draw {
     ///
     /// The left point and right coordinate are clipped to the stencil as necessary.
     fn horizontal_line(&mut self, left: Point, right: Unit, pattern: u8);
+
+    /// Draw a framed rectangle with the given line pattern.
+    fn framed_rectangle(&mut self, upper_left: Point, lower_right: Point, pattern: u8);
+
+    /// Draw a vertical line with the given pattern.
+    ///
+    /// The top point and bottom coordinate are clipped to the stencil as necessary.
+    fn vertical_line(&mut self, top: Point, bottom: Unit, pattern: u8);
 }
 
 /// A Stencil encapsulates a bitmapped image.
@@ -319,6 +327,50 @@ impl Draw for Stencil {
             self.bits[x] = new_byte;
 
             x = x + 1;
+        }
+    }
+
+    fn framed_rectangle(&mut self, upper_left: Point, lower_right: Point, pattern: u8) {
+        let (upper_left, lower_right) = canonize_rectangle(upper_left, lower_right);
+        let (left, top) = upper_left;
+        let (right, bottom) = lower_right;
+
+        self.horizontal_line((left, top), right, pattern);
+        self.horizontal_line((left, bottom - 1), right, pattern);
+        self.vertical_line((left, top), bottom, pattern);
+        self.vertical_line((right - 1, top), bottom, pattern);
+    }
+
+    /// Draw a vertical line with the given pattern.
+    fn vertical_line(&mut self, top: Point, bottom: Unit, pattern: u8) {
+        // Do nothing if the line isn't visible on this stencil.
+        let (left, top) = top;
+        let (stencil_width, stencil_height) = self.dimensions;
+
+        if (left < 0) || (left >= stencil_width) {
+            return
+        }
+
+        let top = top.max(0);
+        let bottom = bottom.min(stencil_height);
+        if top >= bottom {
+            return
+        }
+
+        // Draw the actual line.
+        let stencil_span = (stencil_width + 7) >> 3;
+        let dot_column = left & 7;
+        let old_mask = (0xFF7Fu16 >> dot_column) as u8;
+        let new_mask = (0x0080u16 >> dot_column) as u8;
+
+        let mut y = ((top * stencil_span) + (left >> 3)) as usize;
+        for row in top .. bottom {
+            let old_byte = self.bits[y];
+            let pattern_mask = 0x80u8 >> (row & 7);
+            let new_pattern = if (pattern & pattern_mask) != 0 { 0xFF } else { 0x00 };
+            let new_byte = (old_byte & old_mask) | (new_pattern & new_mask);
+            self.bits[y] = new_byte;
+            y = y + stencil_span as usize;
         }
     }
 }
