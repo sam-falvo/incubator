@@ -7,7 +7,7 @@ use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::simple_printer::SimplePrinter;
 use stencil::types::Rect;
-use stencil::utils::{WHITE_PATTERN, BLACK_PATTERN, LINE_BLACK};
+use stencil::utils::{WHITE_PATTERN, LINE_BLACK};
 
 pub struct Reader {
     text_to_view: RefCell<Option<String>>,
@@ -26,7 +26,7 @@ impl Reader {
         match maybe_contents {
             Some(text) => {
                 let (width, height) = desktop.get_dimensions();
-                let mut printer = SimplePrinter::new(desktop, ((10, 10), (width - 10, height - 10)), &font);
+                let mut printer = SimplePrinter::new(desktop, ((10, 10), (width - 24, height - 10)), &font);
                 printer.print(&text);
                 self.text_to_view.replace(Some(text));
             },
@@ -54,7 +54,8 @@ impl Initializable for Reader {
         let prop_left = text_right + 2;
         let prop_top = top;
         let prop_right = right;
-        let prop_bottom = bottom - 32;
+        let button_height = 16;
+        let prop_bottom = bottom - 2*button_height;
 
         draw_desktop(desktop);
         draw_dialog_box(desktop, (topleft, bottomright));
@@ -62,7 +63,7 @@ impl Initializable for Reader {
         let file_contents = fs::read_to_string("lorem-ipsum.txt");
         match file_contents {
             Err(e) => {
-                let error_reason = format!("Could not open lorem-ipsum.txt because: {}", e);
+                let error_reason = format!("Could not open lorem-ipsum.txt because...\n{}", e);
                 let mut printer = SimplePrinter::new(desktop, ((10, 10), (text_right, height - 10)), &font);
                 printer.print(&error_reason);
             },
@@ -72,22 +73,28 @@ impl Initializable for Reader {
             }
         }
 
+        let icon_y = 4;
+        let up_top = prop_bottom;
+        let up_bottom = up_top + button_height;
+        let dn_top = up_bottom;
+        let dn_bottom = dn_top + button_height;
+
         use bitblt::{BlitContext, BlitOp, blit_rect};
         draw_prop_gadget(desktop, ((prop_left, prop_top), (prop_right, prop_bottom)));
-        desktop.framed_rectangle((prop_left, prop_bottom), (prop_right, prop_bottom+16), LINE_BLACK);
-        desktop.framed_rectangle((prop_left, prop_bottom+16), (prop_right, prop_bottom+32), LINE_BLACK);
+        desktop.framed_rectangle((prop_left, up_top), (prop_right, up_bottom), LINE_BLACK);
+        desktop.framed_rectangle((prop_left, dn_top), (prop_right, dn_bottom), LINE_BLACK);
         {
-            let mut bc = BlitContext::new(&arrow_bits_up, 2, &mut desktop.bits, (width >> 3) as usize);
-            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (prop_bottom + 4) as usize, BlitOp::DandNotS);
+            let mut bc = BlitContext::new(&ARROW_BITS_UP, 2, &mut desktop.bits, (width >> 3) as usize);
+            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (up_top + icon_y) as usize, BlitOp::DandNotS);
         }
         {
-            let mut bc = BlitContext::new(&arrow_bits_dn, 2, &mut desktop.bits, (width >> 3) as usize);
-            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (prop_bottom + 20) as usize, BlitOp::DandNotS);
+            let mut bc = BlitContext::new(&ARROW_BITS_DN, 2, &mut desktop.bits, (width >> 3) as usize);
+            blit_rect(&mut bc, 0, 0, 8, 8, (prop_left + 4) as usize, (dn_top + icon_y) as usize, BlitOp::DandNotS);
         }
     }
 }
 
-static arrow_bits_up: [u8; 16] = [
+static ARROW_BITS_UP: [u8; 16] = [
     0b00011000, 0b00000000,
     0b00011000, 0b00000000,
     0b00111100, 0b00000000,
@@ -98,7 +105,7 @@ static arrow_bits_up: [u8; 16] = [
     0b00011000, 0b00000000,
 ];
 
-static arrow_bits_dn: [u8; 16] = [
+static ARROW_BITS_DN: [u8; 16] = [
     0b00011000, 0b00000000,
     0b00011000, 0b00000000,
     0b00011000, 0b00000000,
