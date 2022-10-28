@@ -12,6 +12,12 @@ pub static BLACK_PATTERN: Pattern = [0, 0, 0, 0, 0, 0, 0, 0];
 /// A pattern consisting of all white pixels.
 pub static WHITE_PATTERN: Pattern = [255, 255, 255, 255, 255, 255, 255, 255];
 
+/// A line pattern guaranteed to consist of black pixels.
+pub static LINE_BLACK: u8 = 0x00;
+
+/// A line pattern guaranteed to consist of white pixels.
+pub static LINE_WHITE: u8 = 0xFF;
+
 
 /// Draws the background for a desktop environment.
 ///
