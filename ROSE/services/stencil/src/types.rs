@@ -10,3 +10,6 @@ pub type Rect = (Point, Point);
 /// A dimension component.
 pub type Dimension = isize;
 
+/// A pair of dimensions indicating a width and a height.
+pub type Dimensions = (Dimension, Dimension);
+
