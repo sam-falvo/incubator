@@ -1,33 +1,59 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use stencil::utils::draw_desktop;
 use stencil::stencil::Stencil;
-use stencil::types::{Point, Rect};
+use stencil::types::{Dimensions, Point, Rect};
 
 /// The root controller shows the desktop background, and keeps track of the mouse pointer.
 /// The root presenter is given by the root environment.
 /// There is no defined root model per se; it is whatever your app needs it to be.
 pub struct ToyState {
     mouse: MouseState,
-    subcomponents: Vec<PushButton<bool>>,
+    subcontrols: Vec<Rc<RefCell<PushButton<bool>>>>,
+    hot: Option<Rc<RefCell<PushButton<bool>>>>,
+    display_dimensions: Dimensions,
 }
 
-pub trait RootController: MouseEventSink + Controller { }
+pub trait RootController: MouseEventSink + Controller + AppController { }
 
 impl RootController for ToyState { }
 
+pub trait AppController {
+    fn request_quit(&self) -> bool;
+}
+
+impl AppController for ToyState {
+    fn request_quit(&self) -> bool {
+        true
+    }
+}
+
 impl MouseEventSink for ToyState {
-    fn pointer_moved(&mut self, p: Point)-> RoseRequest  {
+    fn pointer_moved(&mut self, p: Point) {
         self.mouse.xy = p;
-        RoseRequest::None
+        match self.hot.clone() {
+            None => {
+                self.hot = self.find_enclosing_control(p);
+                if let Some(_) = self.hot {
+                    eprintln!("New hotness");
+                }
+            },
+            Some(h) => {
+                if !h.borrow().has_point(p) {
+                    self.hot = self.find_enclosing_control(p);
+                    eprintln!("From old hotness, we get a new hotness.");
+                } 
+            },
+        }
     }
 
-    fn button_down(&mut self)-> RoseRequest  {
+    fn button_down(&mut self) {
         self.mouse.pressed = true;
-        RoseRequest::None
     }
 
-    fn button_up(&mut self) -> RoseRequest {
+    fn button_up(&mut self) {
         self.mouse.pressed = false;
-        RoseRequest::None
     }
 }
 
@@ -35,24 +61,54 @@ impl Controller for ToyState {
     fn draw(&mut self, desktop: &mut Stencil) {
         draw_desktop(desktop);
 
-        for pb in &mut self.subcomponents {
-            pb.draw(desktop);
+        for sc_refcell in &self.subcontrols {
+            sc_refcell.borrow_mut().draw(desktop);
         }
+    }
+
+    fn get_bounding_rect(&self) -> Rect {
+        ((0, 0), self.display_dimensions)
+    }
+
+    fn has_point(&self, _: Point) -> bool {
+        // We're full-screen, so yes.
+        true
     }
 }
 
 impl ToyState {
-    pub fn new() -> Self {
+    pub fn new(display_dimensions: Dimensions) -> Self {
         let mut s = Self {
+            display_dimensions,
+
             mouse: MouseState::new(),
-            subcomponents: Vec::new(),
+            subcontrols: Vec::new(),
+            hot: None,
         };
 
-        s.subcomponents.push(PushButton::new(((8, 8), (72, 28)), false));
-        s.subcomponents.push(PushButton::new(((80, 8), (144, 28)), true));
+        s.subcontrols.push(Rc::new(RefCell::new(PushButton::new(((8, 8), (72, 28)), false))));
+        s.subcontrols.push(Rc::new(RefCell::new(PushButton::new(((80, 8), (144, 28)), true))));
 
         s
     }
+
+    fn find_enclosing_control(&self, p: Point) -> Option<Rc<RefCell<PushButton<bool>>>> {
+        for subctl in &self.subcontrols {
+            let sc = subctl.borrow();
+
+            if is_point_within(p, sc.get_bounding_rect()) {
+                return Some(subctl.clone());
+            }
+        }
+        None
+    }
+}
+
+fn is_point_within(p: Point, r: Rect) -> bool {
+    let (x, y) = p;
+    let ((left, top), (right, bottom)) = r;
+
+    (left <= x) && (x < right) && (top <= y) && (y < bottom)
 }
 
 /// MouseState keeps track of the current mouse position and button state.
@@ -78,21 +134,15 @@ impl MouseState {
 /// Typically implemented by presenters, but this can also be implemented by controllers as well if
 /// the presenter just funnels events directly through to the controller.
 pub trait MouseEventSink {
-    fn pointer_moved(&mut self, to: Point) -> RoseRequest;
-    fn button_up(&mut self) -> RoseRequest;
-    fn button_down(&mut self) -> RoseRequest;
+    fn pointer_moved(&mut self, to: Point);
+    fn button_up(&mut self);
+    fn button_down(&mut self);
 }
 
 /// Initialize application state and render it for the first time.
 /// Answer with a global event handler.
-pub fn init_root() -> Box<dyn RootController> {
-    Box::new(ToyState::new())
-}
-
-pub enum RoseRequest {
-    None,
-    Quit,
-    RepaintAll,
+pub fn init_root(display_dimensions: Dimensions) -> Box<dyn RootController> {
+    Box::new(ToyState::new(display_dimensions))
 }
 
 // ------------------------------------------------------------------------
@@ -112,6 +162,10 @@ impl PushButtonView {
         Self {
             area,
         }
+    }
+
+    fn get_area(&self) -> Rect {
+        self.area
     }
 
     fn draw_unpressed(&self, s: &mut Stencil) {
@@ -183,6 +237,8 @@ impl BoolViewAbstraction for bool {
 
 pub trait Controller {
     fn draw(&mut self, s: &mut Stencil);
+    fn get_bounding_rect(&self) -> Rect;
+    fn has_point(&self, p: Point) -> bool;
 }
 
 struct PushButton<A: BoolViewAbstraction> {
@@ -198,6 +254,14 @@ impl<A: BoolViewAbstraction> Controller for PushButton<A> {
             self.view.draw_unpressed(s);
         }
     }
+
+    fn get_bounding_rect(&self) -> Rect {
+        self.view.get_area()
+    }
+
+    fn has_point(&self, p: Point) -> bool {
+        is_point_within(p, self.view.get_area())
+    }
 }
 
 impl<A: BoolViewAbstraction> PushButton<A> {
@@ -208,3 +272,13 @@ impl<A: BoolViewAbstraction> PushButton<A> {
         }
     }
 }
+
+// ------------------------------------------------------------------------
+// Event Loop Control interface
+//
+// NOTE: This is NOT a Controller.
+
+pub trait EventLoopControl {
+    fn approve_quit(&mut self);
+}
+

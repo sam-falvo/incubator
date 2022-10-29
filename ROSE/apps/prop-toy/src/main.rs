@@ -9,7 +9,7 @@ use sdl2::mouse::MouseButton;
 use sdlstate::SdlState;
 use stencil::types::{Dimension, Unit};
 use stencil::stencil::{Stencil, Draw};
-use app::{init_root, RoseRequest};
+use app::{init_root};
 
 fn main() {
     // Create the SDL bindings.
@@ -19,23 +19,21 @@ fn main() {
 
     let mut desktop = Stencil::new_with_dimensions(W, H);
 
-    let mut root = init_root();
+    let mut root = init_root((W, H));
     root.draw(&mut desktop);
     'main_event_loop: loop {
         for e in &mut event_iter {
-            let req = match e {
-                Event::Quit { .. } => RoseRequest::Quit,
+            match e {
+                Event::Quit { .. } => {
+                    if root.request_quit() {
+                        break 'main_event_loop;
+                    }
+                },
                 Event::MouseMotion { x, y, .. } => root.pointer_moved((x as Unit, y as Unit)),
                 Event::MouseButtonDown { mouse_btn: b, .. } if b == MouseButton::Left => root.button_down(),
                 Event::MouseButtonUp { mouse_btn: b, .. } if b == MouseButton::Left => root.button_up(),
-                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => RoseRequest::RepaintAll,
-                _ => RoseRequest::None,
-            };
-
-            match req {
-                RoseRequest::None => (),
-                RoseRequest::RepaintAll => repaint(&mut desktop, &mut sdl),
-                RoseRequest::Quit => break 'main_event_loop,
+                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => repaint(&mut desktop, &mut sdl),
+                _ => (),
             }
         }
     }
