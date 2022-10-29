@@ -12,7 +12,6 @@ pub struct ToyState {
     mouse: MouseState,
     subcontrols: Vec<Rc<RefCell<PushButton<bool>>>>,
     hot: Option<Rc<RefCell<PushButton<bool>>>>,
-    display_dimensions: Dimensions,
 }
 
 pub trait RootController: MouseEventSink + Controller + AppController { }
@@ -66,10 +65,6 @@ impl Controller for ToyState {
         }
     }
 
-    fn get_bounding_rect(&self) -> Rect {
-        ((0, 0), self.display_dimensions)
-    }
-
     fn has_point(&self, _: Point) -> bool {
         // We're full-screen, so yes.
         true
@@ -77,10 +72,8 @@ impl Controller for ToyState {
 }
 
 impl ToyState {
-    pub fn new(display_dimensions: Dimensions) -> Self {
+    pub fn new(_display_dimensions: Dimensions) -> Self {
         let mut s = Self {
-            display_dimensions,
-
             mouse: MouseState::new(),
             subcontrols: Vec::new(),
             hot: None,
@@ -96,19 +89,12 @@ impl ToyState {
         for subctl in &self.subcontrols {
             let sc = subctl.borrow();
 
-            if is_point_within(p, sc.get_bounding_rect()) {
+            if sc.has_point(p) {
                 return Some(subctl.clone());
             }
         }
         None
     }
-}
-
-fn is_point_within(p: Point, r: Rect) -> bool {
-    let (x, y) = p;
-    let ((left, top), (right, bottom)) = r;
-
-    (left <= x) && (x < right) && (top <= y) && (y < bottom)
 }
 
 /// MouseState keeps track of the current mouse position and button state.
@@ -237,7 +223,6 @@ impl BoolViewAbstraction for bool {
 
 pub trait Controller {
     fn draw(&mut self, s: &mut Stencil);
-    fn get_bounding_rect(&self) -> Rect;
     fn has_point(&self, p: Point) -> bool;
 }
 
@@ -255,13 +240,16 @@ impl<A: BoolViewAbstraction> Controller for PushButton<A> {
         }
     }
 
-    fn get_bounding_rect(&self) -> Rect {
-        self.view.get_area()
-    }
-
     fn has_point(&self, p: Point) -> bool {
         is_point_within(p, self.view.get_area())
     }
+}
+
+fn is_point_within(p: Point, r: Rect) -> bool {
+    let (x, y) = p;
+    let ((left, top), (right, bottom)) = r;
+
+    (left <= x) && (x < right) && (top <= y) && (y < bottom)
 }
 
 impl<A: BoolViewAbstraction> PushButton<A> {
