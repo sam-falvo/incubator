@@ -81,6 +81,12 @@ pub trait Draw {
     ///
     /// The top point and bottom coordinate are clipped to the stencil as necessary.
     fn vertical_line(&mut self, top: Point, bottom: Unit, pattern: u8);
+
+    /// Inverts a rectangle (all black pixels become white and vice versa).
+    fn invert_rectangle(&mut self, upper_left: Point, lower_right: Point);
+
+    /// Inverts a horizontal line.
+    fn invert_horizontal_line(&mut self, left: Point, right: Unit);
 }
 
 /// A Stencil encapsulates a bitmapped image.
@@ -371,6 +377,68 @@ impl Draw for Stencil {
             let new_byte = (old_byte & old_mask) | (new_pattern & new_mask);
             self.bits[y] = new_byte;
             y = y + stencil_span as usize;
+        }
+    }
+
+    fn invert_rectangle(&mut self, upper_left: Point, lower_right: Point) {
+        let (upper_left, lower_right) = canonize_rectangle(upper_left, lower_right);
+        let (left, top) = upper_left;
+        let (right, bottom) = lower_right;
+        let (width, height) = (right - left, bottom - top);
+
+        if (width <= 0) || (height <= 0) { return }
+
+        for y in 0..height {
+            self.invert_horizontal_line((left, top + y), right);
+        }
+    }
+
+    fn invert_horizontal_line(&mut self, left_pt: Point, right: Unit) {
+        let (left_pt, mut right) = canonize_hline(left_pt, right);
+        let (mut left, top) = left_pt;
+        let (width, height) = self.dimensions;
+
+        // Perform basic clipping to the stencil.
+        //
+        // First, make sure the horizontal line is neither above nor below the stencil.
+        if (top < 0) || (top >= height) { return }
+
+        // Knowing left <= right, check to see if the line is too far to the left or right to be
+        // visible on the stencil.
+        if (right < 0) || (left >= width) { return }
+
+        // Make sure that the line has a width of at least one pixel.
+        if left == right { return }
+
+        // Constrain the coordinates to the stencil.
+        left = left.max(0);
+        right = right.min(width);
+
+        // We know right > left and right-left >= 1.
+        // Decrement right to use inclusive coordinates instead of exclusive.
+        let right = right - 1;
+        let span = (width + 7) >> 3;
+
+        let left_byte = ((span * top) + (left >> 3)) as usize;
+        let right_byte = ((span * top) + (right >> 3)) as usize;
+        let left_mask = LEFT_MASKS[(left & 7) as usize];
+        let right_mask = RIGHT_MASKS[(right & 7) as usize];
+
+        let mut x = left_byte;
+        while x <= right_byte {
+            let mut combined_mask = 0xFF;
+            if x == left_byte {
+                combined_mask &= left_mask;
+            }
+            if x == right_byte {
+                combined_mask &= right_mask;
+            }
+
+            let original_byte = self.bits[x];
+            let new_byte = original_byte ^ combined_mask;
+            self.bits[x] = new_byte;
+
+            x = x + 1;
         }
     }
 }
