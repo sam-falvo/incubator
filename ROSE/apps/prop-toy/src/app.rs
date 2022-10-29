@@ -73,16 +73,14 @@ impl Controller for ToyState {
 
 impl ToyState {
     pub fn new(_display_dimensions: Dimensions) -> Self {
-        let mut s = Self {
+        Self {
             mouse: MouseState::new(),
-            subcontrols: Vec::new(),
+            subcontrols: vec![
+                Rc::new(RefCell::new(PushButton::new(((8, 8), (72, 28)), false))),
+                Rc::new(RefCell::new(PushButton::new(((80, 8), (144, 28)), true))),
+            ],
             hot: None,
-        };
-
-        s.subcontrols.push(Rc::new(RefCell::new(PushButton::new(((8, 8), (72, 28)), false))));
-        s.subcontrols.push(Rc::new(RefCell::new(PushButton::new(((80, 8), (144, 28)), true))));
-
-        s
+        }
     }
 
     fn find_enclosing_control(&self, p: Point) -> Option<Rc<RefCell<PushButton<bool>>>> {
