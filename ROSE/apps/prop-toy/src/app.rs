@@ -9,6 +9,7 @@ pub struct ToyState {
     mouse: MouseState,
     gadgets: Vec<Rc<RefCell<dyn Gadget>>>,
     hot: Option<Rc<RefCell<dyn Gadget>>>,
+    desktop_needs_painting: Cell<bool>,
 }
 
 pub trait RootController: MouseEventSink + AppController + View { }
@@ -22,7 +23,10 @@ pub trait View {
 
 impl View for ToyState {
     fn draw(&self, s: &mut Stencil) {
-        draw_desktop(s);
+        if self.desktop_needs_painting.get() {
+            draw_desktop(s);
+            self.desktop_needs_painting.set(false);
+        }
         for g in &self.gadgets {
             g.borrow().as_view().draw(s);
         }
@@ -44,60 +48,59 @@ impl AppController for ToyState {
     }
 }
 
+impl ToyState {
+    fn select_next_hot_gadget(&mut self, p: Point, med: &mut dyn Mediator) {
+        let candidate = self.gadgets.iter().find(|g| {
+            g.borrow().as_view().encloses_point(p)
+        });
+
+        if let Some(gg) = candidate {
+            self.hot = Some((*gg).clone());
+            gg.borrow_mut().as_mut_controller().enter(p, med);
+        }
+    }
+}
+
+pub trait Mediator {
+    fn repaint_needed(&mut self);
+}
+
 impl MouseEventSink for ToyState {
-    fn pointer_moved(&mut self, p: Point) {
+    fn pointer_moved(&mut self, p: Point, med: &mut dyn Mediator) {
         self.mouse.xy = p;
 
         match &self.hot {
-            None => {
-                let candidate = self.gadgets.iter().find(|g| {
-                    g.borrow().as_view().encloses_point(p)
-                });
-
-                if let Some(gg) = candidate {
-                    self.hot = Some((*gg).clone());
-                    gg.borrow_mut().as_mut_controller().enter(p);
-                }
-            },
-            Some(h) => {
-                if !h.borrow().as_view().encloses_point(p) {
-                    h.borrow_mut().as_mut_controller().leave();
-                    self.hot = None;
-
-                    let candidate = self.gadgets.iter().find(|g| {
-                        g.borrow().as_view().encloses_point(p)
-                    });
-
-                    if let Some(gg) = candidate {
-                        self.hot = Some((*gg).clone());
-                        gg.borrow_mut().as_mut_controller().enter(p);
-                    }
+            None => self.select_next_hot_gadget(p, med),
+            Some(current_hot) => {
+                if current_hot.borrow().as_view().encloses_point(p) {
+                    current_hot.borrow_mut().as_mut_controller().pointer_moved(p, med);
                 } else {
-                    h.borrow_mut().as_mut_controller().pointer_moved(p);
+                    current_hot.borrow_mut().as_mut_controller().leave(med);
+                    self.select_next_hot_gadget(p, med);
                 }
             },
         }
     }
 
-    fn button_down(&mut self) {
+    fn button_down(&mut self, med: &mut dyn Mediator) {
         self.mouse.pressed = true;
         if let Some(gg) = &self.hot {
-            gg.borrow_mut().as_mut_controller().button_down();
+            gg.borrow_mut().as_mut_controller().button_down(med);
         }
     }
 
-    fn button_up(&mut self) {
+    fn button_up(&mut self, med: &mut dyn Mediator) {
         self.mouse.pressed = false;
         if let Some(gg) = &self.hot {
-            gg.borrow_mut().as_mut_controller().button_up();
+            gg.borrow_mut().as_mut_controller().button_up(med);
         }
     }
 
-    fn enter(&mut self, _: Point) {
+    fn enter(&mut self, _: Point, _: &mut dyn Mediator) {
         // Nothing to do
     }
 
-    fn leave(&mut self) {
+    fn leave(&mut self, _: &mut dyn Mediator) {
         // Nothing to do
     }
 }
@@ -108,8 +111,11 @@ impl ToyState {
             mouse: MouseState::new(),
             gadgets: vec![
                 Rc::new(RefCell::new(PushButtonGadget::new(((8,8), (72, 28)), false))),
+                Rc::new(RefCell::new(PushButtonGadget::new(((80,8), (144, 28)), true))),
+                Rc::new(RefCell::new(PushButtonGadget::new(((152,8), (216, 28)), true))),
             ],
             hot: None,
+            desktop_needs_painting: Cell::new(true),
         }
     }
 }
@@ -137,11 +143,11 @@ impl MouseState {
 /// Typically implemented by presenters, but this can also be implemented by controllers as well if
 /// the presenter just funnels events directly through to the controller.
 pub trait MouseEventSink {
-    fn pointer_moved(&mut self, to: Point);
-    fn button_up(&mut self);
-    fn button_down(&mut self);
-    fn enter(&mut self, at: Point);
-    fn leave(&mut self);
+    fn pointer_moved(&mut self, to: Point, med: &mut dyn Mediator);
+    fn button_up(&mut self, med: &mut dyn Mediator);
+    fn button_down(&mut self, med: &mut dyn Mediator);
+    fn enter(&mut self, at: Point, med: &mut dyn Mediator);
+    fn leave(&mut self, med: &mut dyn Mediator);
 }
 
 /// Initialize application state and render it for the first time.
@@ -151,16 +157,9 @@ pub fn init_root(display_dimensions: Dimensions) -> Box<dyn RootController> {
 }
 
 // ------------------------------------------------------------------------
-// Event Loop Control interface
-//
-// NOTE: This is NOT a Controller in an MVC or PAC sense.
-
-pub trait EventLoopControl {
-    fn approve_quit(&mut self);
-}
-
-// ------------------------------------------------------------------------
 // Boolean gadgets
+
+use std::cell::Cell;
 
 use stencil::stencil::Draw;
 use stencil::utils::{LINE_BLACK, LINE_WHITE, BLACK_PATTERN, WHITE_PATTERN};
@@ -173,6 +172,7 @@ pub trait Gadget {
 pub struct PushButtonGadget {
     area: Rect,
     is_pressed: bool,
+    needs_repaint: Cell<bool>,
 }
 
 impl PushButtonGadget {
@@ -180,7 +180,13 @@ impl PushButtonGadget {
         Self {
             area,
             is_pressed,
+            needs_repaint: Cell::new(true),
         }
+    }
+
+    fn repaint_needed(&mut self, med: &mut dyn Mediator) {
+        med.repaint_needed();
+        self.needs_repaint.set(true);
     }
 
     fn draw_pb_unpressed(&self, s: &mut Stencil) {
@@ -238,10 +244,13 @@ impl PushButtonGadget {
 
 impl View for PushButtonGadget {
     fn draw(&self, s: &mut Stencil) {
-        if self.is_pressed {
-            self.draw_pb_pressed(s);
-        } else {
-            self.draw_pb_unpressed(s);
+        if self.needs_repaint.get() {
+            if self.is_pressed {
+                self.draw_pb_pressed(s);
+            } else {
+                self.draw_pb_unpressed(s);
+            }
+            self.needs_repaint.set(false);
         }
     }
 
@@ -254,25 +263,25 @@ impl View for PushButtonGadget {
 }
 
 impl MouseEventSink for PushButtonGadget {
-    fn pointer_moved(&mut self, _to: Point) {
-        eprintln!("P");
-    }
-
-    fn button_down(&mut self) {
-        eprintln!("D");
-    }
-
-    fn button_up(&mut self) {
-        eprintln!("U");
-    }
-
-    fn enter(&mut self, _: Point) {
-        eprintln!("E");
+    fn pointer_moved(&mut self, _to: Point, _med: &mut dyn Mediator) {
         // Nothing to do
     }
 
-    fn leave(&mut self) {
-        eprintln!("L");
+    fn button_down(&mut self, med: &mut dyn Mediator) {
+        self.is_pressed = !self.is_pressed;
+        self.repaint_needed(med);
+    }
+
+    fn button_up(&mut self, med: &mut dyn Mediator) {
+        self.is_pressed = !self.is_pressed;
+        self.repaint_needed(med);
+    }
+
+    fn enter(&mut self, _: Point, _med: &mut dyn Mediator) {
+        // Nothing to do
+    }
+
+    fn leave(&mut self, _med: &mut dyn Mediator) {
         // Nothing to do
     }
 }
