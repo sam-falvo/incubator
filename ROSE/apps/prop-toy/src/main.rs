@@ -20,7 +20,7 @@ fn main() {
     let mut desktop = Stencil::new_with_dimensions(W, H);
 
     let mut top_mediator = TopMediator::new();
-    let mut root = init_root((W, H));
+    let mut root = init_root(&mut desktop);
     root.draw(&mut desktop);
     'main_event_loop: loop {
         for e in &mut event_iter {
@@ -45,6 +45,14 @@ fn main() {
                 Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => repaint(&mut desktop, &mut sdl),
                 _ => (),
             }
+
+            if top_mediator.quit_requested {
+                if root.request_quit() {
+                    break 'main_event_loop;
+                } else {
+                    top_mediator.clear_quit();
+                }
+            }
         }
     }
 }
@@ -67,11 +75,15 @@ fn repaint(desktop: &mut Stencil, sdl: &mut SdlState) {
 
 struct TopMediator {
     needs_repaint: bool,
+    quit_requested: bool,
 }
 
 impl TopMediator {
     fn new() -> Self {
-        Self { needs_repaint: false, }
+        Self {
+            needs_repaint: false, 
+            quit_requested: false,
+        }
     }
 
     fn try_redrawing(&mut self, root: &mut dyn RootController, desktop: &mut Stencil, sdl: &mut SdlState) {
@@ -81,11 +93,19 @@ impl TopMediator {
             self.needs_repaint = false;
         }
     }
+
+    fn clear_quit(&mut self) {
+        self.quit_requested = false;
+    }
 }
 
 impl Mediator for TopMediator {
     fn repaint_needed(&mut self) {
         self.needs_repaint = true;
+    }
+
+    fn quit(&mut self) {
+        self.quit_requested = true;
     }
 }
 
