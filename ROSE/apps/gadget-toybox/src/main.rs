@@ -19,25 +19,25 @@ fn main() {
 
     let mut desktop = Stencil::new_with_dimensions(W, H);
     let mut top_mediator = TopMediator::new(&mut desktop);
-    let mut root = init_root(&mut top_mediator);
+    let mut app = init_root(&mut top_mediator);
     'main_event_loop: loop {
         for e in &mut event_iter {
             match e {
                 Event::Quit { .. } => {
-                    if root.request_quit() {
+                    if app.request_quit() {
                         break 'main_event_loop;
                     }
                 },
                 Event::MouseMotion { x, y, .. } => {
-                    root.pointer_moved(&mut top_mediator, (x as Unit, y as Unit));
+                    app.pointer_moved(&mut top_mediator, (x as Unit, y as Unit));
                     top_mediator.try_redrawing(&mut sdl);
                 }
                 Event::MouseButtonDown { mouse_btn: b, .. } if b == MouseButton::Left => {
-                    root.button_down(&mut top_mediator);
+                    app.button_down(&mut top_mediator);
                     top_mediator.try_redrawing(&mut sdl);
                 }
                 Event::MouseButtonUp { mouse_btn: b, .. } if b == MouseButton::Left => {
-                    root.button_up(&mut top_mediator);
+                    app.button_up(&mut top_mediator);
                     top_mediator.try_redrawing(&mut sdl);
                 }
                 Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => repaint(&mut top_mediator.desktop, &mut sdl),
@@ -45,7 +45,7 @@ fn main() {
             }
 
             if top_mediator.quit_requested {
-                if root.request_quit() {
+                if app.request_quit() {
                     break 'main_event_loop;
                 } else {
                     top_mediator.clear_quit();
