@@ -49,6 +49,7 @@ enum Selectable {
     None,
     QuitButton,
     LeftRulerKnob,
+    RightRulerKnob,
 }
 
 impl ToyBoxApp {
@@ -178,8 +179,18 @@ impl MouseEventSink for ToyBoxApp {
             Selectable::LeftRulerKnob => {
                 let new_x = pt.0;
 
-                if (self.hr_area.0.0 <= new_x) && (new_x <= self.hr_cursor_right - 16) {
+                if (self.hr_area.0.0 <= new_x) && (new_x < self.hr_cursor_right - 16) {
                     self.hr_cursor_left = new_x;
+                    self.draw_rulers(med);
+                    med.repaint_all();
+                }
+            }
+
+            Selectable::RightRulerKnob => {
+                let new_x = pt.0;
+
+                if (self.hr_cursor_left + 16 <= new_x) && (new_x < self.hr_area.1.0) {
+                    self.hr_cursor_right = new_x;
                     self.draw_rulers(med);
                     med.repaint_all();
                 }
@@ -194,8 +205,10 @@ impl MouseEventSink for ToyBoxApp {
             self.selected = Selectable::QuitButton;
             med.borrow_mut_desktop().invert_rectangle(self.quit_area.0, self.quit_area.1);
             med.repaint_all();
-        } else if self.mouse_in_hr_left_corsor() {
+        } else if self.mouse_in_hr_left_cursor() {
             self.selected = Selectable::LeftRulerKnob;
+        } else if self.mouse_in_hr_right_cursor() {
+            self.selected = Selectable::RightRulerKnob;
         }
     }
 
@@ -229,7 +242,7 @@ fn rect_contains(r: Rect, p: Point) -> bool {
 }
 
 impl ToyBoxApp {
-    fn mouse_in_hr_left_corsor(&self) -> bool {
+    fn mouse_in_hr_left_cursor(&self) -> bool {
         let cursor_left = self.hr_cursor_left;
         let cursor_top = self.hr_area.0.1;
         let cursor_right = cursor_left + 8;
@@ -239,4 +252,13 @@ impl ToyBoxApp {
         rect_contains(cursor_area, self.mouse_pt)
     }
 
+    fn mouse_in_hr_right_cursor(&self) -> bool {
+        let cursor_right = self.hr_cursor_right;
+        let cursor_bottom = self.hr_area.1.1;
+        let cursor_left = cursor_right - 8;
+        let cursor_top = self.hr_area.0.1;
+
+        let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
+        rect_contains(cursor_area, self.mouse_pt)
+    }
 }
