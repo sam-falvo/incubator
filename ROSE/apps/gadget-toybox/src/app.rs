@@ -2,7 +2,7 @@ use stencil::utils::{draw_desktop, draw_dialog_box};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::stencil::Stencil;
 use stencil::stencil::Draw;
-use stencil::types::{Dimension, Point, Rect};
+use stencil::types::{Dimension, Point, Rect, Unit};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::simple_printer::SimplePrinter;
@@ -40,6 +40,9 @@ pub struct ToyBoxApp {
     quit_area: Rect,
     mouse_pt: Point,
     selected: Selectable,
+    hr_area: Rect,
+    hr_cursor_left: Unit,
+    hr_cursor_right: Unit,
 }
 
 enum Selectable {
@@ -54,6 +57,9 @@ impl ToyBoxApp {
             quit_area: ((248, 8), (312, 28)),
             mouse_pt: (0, 0),
             selected: Selectable::None,
+            hr_area: ((24, 16), (224, 24)),
+            hr_cursor_left: 24,
+            hr_cursor_right: 223,
         }
     }
 
@@ -65,6 +71,26 @@ impl ToyBoxApp {
 
         // Draw the window in which our prop gadgets will sit.
         draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
+        self.draw_rulers(med);
+    }
+
+    fn draw_rulers(&mut self, med: &mut dyn Mediator) {
+        let d = med.borrow_mut_desktop();
+        let ((hr_left, hr_top), (hr_right, hr_bottom)) = self.hr_area;
+        let hr_rule_y = (hr_top + hr_bottom) >> 1;
+        let hr_cursor_left = self.hr_cursor_left;
+        let hr_cursor_right = self.hr_cursor_right;
+
+        d.filled_rectangle(self.hr_area.0, self.hr_area.1, &WHITE_PATTERN);
+        d.horizontal_line((hr_left, hr_rule_y), hr_right, LINE_BLACK);
+
+        d.vertical_line((hr_cursor_left, hr_top), hr_bottom, LINE_BLACK);
+        d.horizontal_line((hr_cursor_left, hr_top), hr_cursor_left + 8, LINE_BLACK);
+        d.horizontal_line((hr_cursor_left, hr_bottom), hr_cursor_left + 8, LINE_BLACK);
+
+        d.vertical_line((hr_cursor_right, hr_top), hr_bottom, LINE_BLACK);
+        d.horizontal_line((hr_cursor_right - 8, hr_top), hr_cursor_right, LINE_BLACK);
+        d.horizontal_line((hr_cursor_right - 8, hr_bottom), hr_cursor_right, LINE_BLACK);
     }
 }
 
