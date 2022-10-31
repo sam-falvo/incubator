@@ -1,4 +1,4 @@
-use stencil::utils::draw_desktop;
+use stencil::utils::{draw_desktop, draw_dialog_box};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::stencil::Stencil;
 use stencil::stencil::Draw;
@@ -36,6 +36,7 @@ pub fn init_root(med: &mut dyn Mediator) -> Box<dyn AppController> {
 }
 
 pub struct ToyBoxApp {
+    dbox_area: Rect,
     quit_area: Rect,
     mouse_pt: Point,
     selected: Selectable,
@@ -49,6 +50,7 @@ enum Selectable {
 impl ToyBoxApp {
     pub fn new() -> Self {
         Self {
+            dbox_area: ((8, 8),(240, 56)),
             quit_area: ((248, 8), (312, 28)),
             mouse_pt: (0, 0),
             selected: Selectable::None,
@@ -60,6 +62,9 @@ impl ToyBoxApp {
 
         // Draw the quit button
         draw_button(med, self.quit_area, "Quit");
+
+        // Draw the window in which our prop gadgets will sit.
+        draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
     }
 }
 
