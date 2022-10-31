@@ -48,6 +48,7 @@ pub struct ToyBoxApp {
 enum Selectable {
     None,
     QuitButton,
+    LeftRulerKnob,
 }
 
 impl ToyBoxApp {
@@ -80,17 +81,18 @@ impl ToyBoxApp {
         let hr_rule_y = (hr_top + hr_bottom) >> 1;
         let hr_cursor_left = self.hr_cursor_left;
         let hr_cursor_right = self.hr_cursor_right;
+        let hr_knob_bottom = self.hr_area.1.1 - 1;
 
         d.filled_rectangle(self.hr_area.0, self.hr_area.1, &WHITE_PATTERN);
         d.horizontal_line((hr_left, hr_rule_y), hr_right, LINE_BLACK);
 
         d.vertical_line((hr_cursor_left, hr_top), hr_bottom, LINE_BLACK);
         d.horizontal_line((hr_cursor_left, hr_top), hr_cursor_left + 8, LINE_BLACK);
-        d.horizontal_line((hr_cursor_left, hr_bottom), hr_cursor_left + 8, LINE_BLACK);
+        d.horizontal_line((hr_cursor_left, hr_knob_bottom), hr_cursor_left + 8, LINE_BLACK);
 
         d.vertical_line((hr_cursor_right, hr_top), hr_bottom, LINE_BLACK);
         d.horizontal_line((hr_cursor_right - 8, hr_top), hr_cursor_right, LINE_BLACK);
-        d.horizontal_line((hr_cursor_right - 8, hr_bottom), hr_cursor_right, LINE_BLACK);
+        d.horizontal_line((hr_cursor_right - 8, hr_knob_bottom), hr_cursor_right, LINE_BLACK);
     }
 }
 
@@ -169,8 +171,22 @@ impl AppEventSink for ToyBoxApp {
 }
 
 impl MouseEventSink for ToyBoxApp {
-    fn pointer_moved(&mut self, _: &mut dyn Mediator, pt: Point) {
+    fn pointer_moved(&mut self, med: &mut dyn Mediator, pt: Point) {
         self.mouse_pt = pt;
+
+        match self.selected {
+            Selectable::LeftRulerKnob => {
+                let new_x = pt.0;
+
+                if (self.hr_area.0.0 <= new_x) && (new_x <= self.hr_cursor_right - 16) {
+                    self.hr_cursor_left = new_x;
+                    self.draw_rulers(med);
+                    med.repaint_all();
+                }
+            }
+
+            _ => (),
+        }
     }
 
     fn button_down(&mut self, med: &mut dyn Mediator) {
@@ -178,6 +194,8 @@ impl MouseEventSink for ToyBoxApp {
             self.selected = Selectable::QuitButton;
             med.borrow_mut_desktop().invert_rectangle(self.quit_area.0, self.quit_area.1);
             med.repaint_all();
+        } else if self.mouse_in_hr_left_corsor() {
+            self.selected = Selectable::LeftRulerKnob;
         }
     }
 
@@ -210,3 +228,15 @@ fn rect_contains(r: Rect, p: Point) -> bool {
     (left <= x) && (x < right) && (top <= y) && (y < bottom)
 }
 
+impl ToyBoxApp {
+    fn mouse_in_hr_left_corsor(&self) -> bool {
+        let cursor_left = self.hr_cursor_left;
+        let cursor_top = self.hr_area.0.1;
+        let cursor_right = cursor_left + 8;
+        let cursor_bottom = self.hr_area.1.1;
+
+        let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
+        rect_contains(cursor_area, self.mouse_pt)
+    }
+
+}
