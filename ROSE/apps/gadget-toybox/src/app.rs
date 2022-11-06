@@ -43,6 +43,7 @@ pub struct ToyBoxApp<'l, 'f> {
     sel_b: PushButtonView<'l, 'f>,
     sel_c: PushButtonView<'l, 'f>,
     sel: Selector,
+    sel_d: PushButtonView<'l, 'f>,
 }
 
 /// Our toggle-buttons implement a kind of "radio button" control.
@@ -106,6 +107,11 @@ impl<'l, 'f> ToyBoxApp<'l, 'f> {
                 &SYSTEM_BITMAP_FONT,
             ),
             sel: Selector::OptionA,
+            sel_d: PushButtonView::new(
+                ((248, 134), (312, 154)),
+                "Push me!",
+                &SYSTEM_BITMAP_FONT,
+            ),
         }
     }
 
@@ -129,6 +135,9 @@ impl<'l, 'f> ToyBoxApp<'l, 'f> {
         self.sel_b.draw(med);
         self.sel_c.draw(med);
         self.invert_selection(med);
+
+        // Draw dummy push-button.
+        self.sel_d.draw(med);
 
         // Draw the window in which our prop gadgets will sit.
         draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
@@ -269,6 +278,7 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.sel_a.pointer_moved(med, pt);
         let _ = self.sel_b.pointer_moved(med, pt);
         let _ = self.sel_c.pointer_moved(med, pt);
+        let _ = self.sel_d.pointer_moved(med, pt);
 
         // Now let's consider pointer motion events for what the user
         // thinks are custom gadgets.
@@ -325,6 +335,7 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.sel_a.button_down(med);
         let _ = self.sel_b.button_down(med);
         let _ = self.sel_c.button_down(med);
+        let _ = self.sel_d.button_down(med);
 
         // Handle button events for the custom gadgets.
 
@@ -381,6 +392,16 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
             _ => (),
         }
 
+        match self.sel_d.button_up(med) {
+            PushButtonEvent::Clicked => {
+                // Not selected anymore, so undo inversion.
+                self.sel_d.invert(med);
+                med.repaint_all();
+                println!("You clicked me!");
+            }
+            _ => (),
+        }
+
         // Handle button events for the custom gadgets.
 
         self.selected = Selectable::None;
@@ -394,6 +415,7 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.sel_a.enter(med, at);
         let _ = self.sel_b.enter(med, at);
         let _ = self.sel_c.enter(med, at);
+        let _ = self.sel_d.enter(med, at);
     }
 
     fn leave(&mut self, med: &mut dyn Mediator) {
@@ -404,6 +426,7 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.sel_a.leave(med);
         let _ = self.sel_b.leave(med);
         let _ = self.sel_c.leave(med);
+        let _ = self.sel_d.leave(med);
     }
 }
 
