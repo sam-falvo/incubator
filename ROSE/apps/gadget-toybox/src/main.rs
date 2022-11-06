@@ -4,13 +4,13 @@ extern crate sdlstate;
 const W: Dimension = 320;
 const H: Dimension = 200;
 
+use app::init_root;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::mouse::MouseButton;
 use sdlstate::SdlState;
-use stencil::types::{Dimension, Unit};
-use stencil::stencil::{Stencil, Draw};
 use stencil::mediator::Mediator;
-use app::init_root;
+use stencil::stencil::{Draw, Stencil};
+use stencil::types::{Dimension, Unit};
 
 fn main() {
     // Create the SDL bindings.
@@ -28,7 +28,7 @@ fn main() {
                     if app.request_quit() {
                         break 'main_event_loop;
                     }
-                },
+                }
                 Event::MouseMotion { x, y, .. } => {
                     app.pointer_moved(&mut top_mediator, (x as Unit, y as Unit));
                     top_mediator.try_redrawing(&mut sdl);
@@ -41,7 +41,9 @@ fn main() {
                     app.button_up(&mut top_mediator);
                     top_mediator.try_redrawing(&mut sdl);
                 }
-                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => repaint(&mut top_mediator.desktop, &mut sdl),
+                Event::Window { win_event: we, .. } if we == WindowEvent::Exposed => {
+                    repaint(&mut top_mediator.desktop, &mut sdl)
+                }
                 _ => (),
             }
 
@@ -114,4 +116,3 @@ impl<'a> Mediator for TopMediator<'a> {
 }
 
 mod app;
-

@@ -1,15 +1,15 @@
-use stencil::utils::{draw_desktop, draw_dialog_box};
-use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
-use stencil::stencil::Draw;
-use stencil::types::{Point, Rect, Unit};
-use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+use stencil::events::{AppController, AppEventSink, MouseEventSink};
+use stencil::mediator::Mediator;
 use stencil::simple_bitmap_font::text_width;
 use stencil::simple_printer::SimplePrinter;
-use stencil::events::{MouseEventSink, AppEventSink, AppController};
-use stencil::view::{View, rect_contains};
-use stencil::mediator::Mediator;
+use stencil::stencil::Draw;
+use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+use stencil::types::{Point, Rect, Unit};
+use stencil::utils::{draw_desktop, draw_dialog_box};
+use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
+use stencil::view::{rect_contains, View};
 
-use stencil::gadgets::proportional::{PropGadgetView, PropGadgetEvent};
+use stencil::gadgets::proportional::{PropGadgetEvent, PropGadgetView};
 
 /// This is the main entry point to all ROSE applications.
 ///
@@ -62,7 +62,7 @@ impl ToyBoxApp {
     /// Provides the application state with default values.
     pub fn new() -> Self {
         Self {
-            dbox_area: ((8, 8),(240, 192)),
+            dbox_area: ((8, 8), (240, 192)),
             quit_area: ((248, 8), (312, 28)),
             mouse_pt: (0, 0),
             selected: Selectable::None,
@@ -96,13 +96,18 @@ impl ToyBoxApp {
     }
 
     fn draw_prop_gadgets(&mut self, med: &mut dyn Mediator) {
-        self.hprop.set_knob(((self.hr_cursor_left, 30), (self.hr_cursor_right + 1, 38)));
+        self.hprop
+            .set_knob(((self.hr_cursor_left, 30), (self.hr_cursor_right + 1, 38)));
         self.hprop.draw(med);
 
-        self.vprop.set_knob(((210, self.vr_cursor_top), (218, self.vr_cursor_bottom + 1)));
+        self.vprop
+            .set_knob(((210, self.vr_cursor_top), (218, self.vr_cursor_bottom + 1)));
         self.vprop.draw(med);
 
-        self.xyprop.set_knob(((self.hr_cursor_left, self.vr_cursor_top), (self.hr_cursor_right + 1, self.vr_cursor_bottom + 1)));
+        self.xyprop.set_knob((
+            (self.hr_cursor_left, self.vr_cursor_top),
+            (self.hr_cursor_right + 1, self.vr_cursor_bottom + 1),
+        ));
         self.xyprop.draw(med);
     }
 
@@ -117,18 +122,26 @@ impl ToyBoxApp {
         let hr_rule_y = (hr_top + hr_bottom) >> 1;
         let hr_cursor_left = self.hr_cursor_left;
         let hr_cursor_right = self.hr_cursor_right;
-        let hr_knob_bottom = self.hr_area.1.1 - 1; // Why did I need this again?
+        let hr_knob_bottom = self.hr_area.1 .1 - 1; // Why did I need this again?
 
         d.filled_rectangle(self.hr_area.0, self.hr_area.1, &WHITE_PATTERN);
         d.horizontal_line((hr_left, hr_rule_y), hr_right, LINE_BLACK);
 
         d.vertical_line((hr_cursor_left, hr_top), hr_bottom, LINE_BLACK);
         d.horizontal_line((hr_cursor_left, hr_top), hr_cursor_left + 8, LINE_BLACK);
-        d.horizontal_line((hr_cursor_left, hr_knob_bottom), hr_cursor_left + 8, LINE_BLACK);
+        d.horizontal_line(
+            (hr_cursor_left, hr_knob_bottom),
+            hr_cursor_left + 8,
+            LINE_BLACK,
+        );
 
         d.vertical_line((hr_cursor_right, hr_top), hr_bottom, LINE_BLACK);
         d.horizontal_line((hr_cursor_right - 8, hr_top), hr_cursor_right, LINE_BLACK);
-        d.horizontal_line((hr_cursor_right - 8, hr_knob_bottom), hr_cursor_right, LINE_BLACK);
+        d.horizontal_line(
+            (hr_cursor_right - 8, hr_knob_bottom),
+            hr_cursor_right,
+            LINE_BLACK,
+        );
     }
 
     fn draw_v_ruler(&mut self, med: &mut dyn Mediator) {
@@ -146,8 +159,16 @@ impl ToyBoxApp {
         d.vertical_line((vr_right - 1, vr_cursor_top), vr_cursor_top + 8, LINE_BLACK);
 
         d.horizontal_line((vr_left, vr_cursor_bottom), vr_right, LINE_BLACK);
-        d.vertical_line((vr_left, vr_cursor_bottom - 8), vr_cursor_bottom, LINE_BLACK);
-        d.vertical_line((vr_right - 1, vr_cursor_bottom - 8), vr_cursor_bottom, LINE_BLACK);
+        d.vertical_line(
+            (vr_left, vr_cursor_bottom - 8),
+            vr_cursor_bottom,
+            LINE_BLACK,
+        );
+        d.vertical_line(
+            (vr_right - 1, vr_cursor_bottom - 8),
+            vr_cursor_bottom,
+            LINE_BLACK,
+        );
     }
 }
 
@@ -181,8 +202,16 @@ fn draw_button(med: &mut dyn Mediator, area: Rect, label: &str) {
     let label_top = subview_top + font.baseline;
     let label_region = ((label_left, label_top), (subview_right, subview_bottom));
 
-    d.filled_rectangle((subview_left, subview_top), (subview_right, subview_bottom), &WHITE_PATTERN);
-    d.framed_rectangle((border_left, border_top), (border_right, border_bottom), LINE_BLACK);
+    d.filled_rectangle(
+        (subview_left, subview_top),
+        (subview_right, subview_bottom),
+        &WHITE_PATTERN,
+    );
+    d.framed_rectangle(
+        (border_left, border_top),
+        (border_right, border_bottom),
+        LINE_BLACK,
+    );
     d.horizontal_line((b_shadow_left, b_shadow_top), b_shadow_right, LINE_BLACK);
     d.vertical_line((r_shadow_left, r_shadow_top), r_shadow_bottom, LINE_BLACK);
 
@@ -191,7 +220,7 @@ fn draw_button(med: &mut dyn Mediator, area: Rect, label: &str) {
 }
 
 /// Tell the host environment that we are equipped to represent the whole application.
-impl AppController for ToyBoxApp { }
+impl AppController for ToyBoxApp {}
 
 /// Tell the host environment we can determine the application life-cycle.
 impl AppEventSink for ToyBoxApp {
@@ -214,7 +243,7 @@ impl MouseEventSink<()> for ToyBoxApp {
                 self.vr_cursor_top = top;
                 self.hr_cursor_right = right - 1;
                 self.vr_cursor_bottom = bottom - 1;
-            },
+            }
 
             _ => (),
         }
@@ -223,7 +252,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             PropGadgetEvent::KnobMoved(((_, top), (_, bottom))) => {
                 self.vr_cursor_top = top;
                 self.vr_cursor_bottom = bottom - 1;
-            },
+            }
 
             _ => (),
         }
@@ -232,7 +261,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             PropGadgetEvent::KnobMoved(((left, _), (right, _))) => {
                 self.hr_cursor_left = left;
                 self.hr_cursor_right = right - 1;
-            },
+            }
 
             _ => (),
         }
@@ -244,7 +273,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             Selectable::LeftRulerKnob => {
                 let new_x = pt.0;
 
-                if (self.hr_area.0.0 <= new_x) && (new_x < self.hr_cursor_right - 16) {
+                if (self.hr_area.0 .0 <= new_x) && (new_x < self.hr_cursor_right - 16) {
                     self.hr_cursor_left = new_x;
                 }
             }
@@ -252,7 +281,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             Selectable::RightRulerKnob => {
                 let new_x = pt.0;
 
-                if (self.hr_cursor_left + 16 <= new_x) && (new_x < self.hr_area.1.0) {
+                if (self.hr_cursor_left + 16 <= new_x) && (new_x < self.hr_area.1 .0) {
                     self.hr_cursor_right = new_x;
                 }
             }
@@ -260,7 +289,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             Selectable::TopRulerKnob => {
                 let new_y = pt.1;
 
-                if (self.vr_area.0.1 <= new_y) && (new_y < self.vr_cursor_bottom - 16) {
+                if (self.vr_area.0 .1 <= new_y) && (new_y < self.vr_cursor_bottom - 16) {
                     self.vr_cursor_top = new_y;
                 }
             }
@@ -268,7 +297,7 @@ impl MouseEventSink<()> for ToyBoxApp {
             Selectable::BottomRulerKnob => {
                 let new_y = pt.1;
 
-                if (self.vr_cursor_top + 16 <= new_y) && (new_y < self.vr_area.1.1) {
+                if (self.vr_cursor_top + 16 <= new_y) && (new_y < self.vr_area.1 .1) {
                     self.vr_cursor_bottom = new_y;
                 }
             }
@@ -292,7 +321,8 @@ impl MouseEventSink<()> for ToyBoxApp {
 
         if rect_contains(self.quit_area, self.mouse_pt) {
             self.selected = Selectable::QuitButton;
-            med.borrow_mut_desktop().invert_rectangle(self.quit_area.0, self.quit_area.1);
+            med.borrow_mut_desktop()
+                .invert_rectangle(self.quit_area.0, self.quit_area.1);
             med.repaint_all();
         } else if self.mouse_in_hr_left_cursor() {
             self.selected = Selectable::LeftRulerKnob;
@@ -316,7 +346,8 @@ impl MouseEventSink<()> for ToyBoxApp {
 
         match self.selected {
             Selectable::QuitButton => {
-                med.borrow_mut_desktop().invert_rectangle(self.quit_area.0, self.quit_area.1);
+                med.borrow_mut_desktop()
+                    .invert_rectangle(self.quit_area.0, self.quit_area.1);
                 med.repaint_all();
                 if rect_contains(self.quit_area, self.mouse_pt) {
                     med.quit();
@@ -344,9 +375,9 @@ impl MouseEventSink<()> for ToyBoxApp {
 impl ToyBoxApp {
     fn mouse_in_hr_left_cursor(&self) -> bool {
         let cursor_left = self.hr_cursor_left;
-        let cursor_top = self.hr_area.0.1;
+        let cursor_top = self.hr_area.0 .1;
         let cursor_right = cursor_left + 8;
-        let cursor_bottom = self.hr_area.1.1;
+        let cursor_bottom = self.hr_area.1 .1;
 
         let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
         rect_contains(cursor_area, self.mouse_pt)
@@ -354,16 +385,16 @@ impl ToyBoxApp {
 
     fn mouse_in_hr_right_cursor(&self) -> bool {
         let cursor_right = self.hr_cursor_right;
-        let cursor_bottom = self.hr_area.1.1;
+        let cursor_bottom = self.hr_area.1 .1;
         let cursor_left = cursor_right - 8;
-        let cursor_top = self.hr_area.0.1;
+        let cursor_top = self.hr_area.0 .1;
 
         let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
         rect_contains(cursor_area, self.mouse_pt)
     }
 
     fn mouse_in_vr_top_cursor(&self) -> bool {
-        let cursor_left = self.vr_area.0.0;
+        let cursor_left = self.vr_area.0 .0;
         let cursor_top = self.vr_cursor_top;
         let cursor_right = cursor_left + 8;
         let cursor_bottom = cursor_top + 8;
@@ -373,7 +404,7 @@ impl ToyBoxApp {
     }
 
     fn mouse_in_vr_bottom_cursor(&self) -> bool {
-        let cursor_left = self.vr_area.0.0;
+        let cursor_left = self.vr_area.0 .0;
         let cursor_top = self.vr_cursor_bottom - 8;
         let cursor_right = cursor_left + 8;
         let cursor_bottom = cursor_top + 8;
@@ -382,4 +413,3 @@ impl ToyBoxApp {
         rect_contains(cursor_area, self.mouse_pt)
     }
 }
-
