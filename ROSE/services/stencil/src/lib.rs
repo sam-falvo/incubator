@@ -8,3 +8,7 @@ pub mod chase;
 pub mod events;
 pub mod view;
 pub mod mediator;
+
+pub mod gadgets {
+    pub mod proportional;
+}

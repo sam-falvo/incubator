@@ -9,7 +9,7 @@ use stencil::events::{MouseEventSink, AppEventSink, AppController};
 use stencil::view::{View, rect_contains};
 use stencil::mediator::Mediator;
 
-use crate::proportional::{PropGadgetView, PropGadgetEvent};
+use stencil::gadgets::proportional::{PropGadgetView, PropGadgetEvent};
 
 /// This is the main entry point to all ROSE applications.
 ///
