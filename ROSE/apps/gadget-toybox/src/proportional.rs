@@ -117,7 +117,6 @@ impl MouseEventSink<PropGadgetEvent> for Model {
             let new_bottom = new_bottom + constraint_bottom;
 
             let new_knob = ((new_left, new_top), (new_right, new_bottom));
-            self.set_knob(new_knob);
             evt = PropGadgetEvent::KnobMoved(new_knob);
         }
         self.mouse_pt = to;
