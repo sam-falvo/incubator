@@ -238,10 +238,6 @@ impl MouseEventSink<()> for ToyBoxApp {
                 self.vr_cursor_top = r.0.1;
                 self.hr_cursor_right = r.1.0 - 1;
                 self.vr_cursor_bottom = r.1.1 - 1;
-
-                self.draw_rulers(med);
-                self.draw_prop_gadgets(med);
-                med.repaint_all();
             },
 
             _ => (),
@@ -251,10 +247,6 @@ impl MouseEventSink<()> for ToyBoxApp {
             PropGadgetEvent::KnobMoved(r) => {
                 self.vr_cursor_top = r.0.1;
                 self.vr_cursor_bottom = r.1.1 - 1;
-
-                self.draw_rulers(med);
-                self.draw_prop_gadgets(med);
-                med.repaint_all();
             },
 
             _ => (),
@@ -264,10 +256,6 @@ impl MouseEventSink<()> for ToyBoxApp {
             PropGadgetEvent::KnobMoved(r) => {
                 self.hr_cursor_left = r.0.0;
                 self.hr_cursor_right = r.1.0 - 1;
-
-                self.draw_rulers(med);
-                self.draw_prop_gadgets(med);
-                med.repaint_all();
             },
 
             _ => (),
@@ -279,9 +267,6 @@ impl MouseEventSink<()> for ToyBoxApp {
 
                 if (self.hr_area.0.0 <= new_x) && (new_x < self.hr_cursor_right - 16) {
                     self.hr_cursor_left = new_x;
-                    self.draw_rulers(med);
-                    self.draw_prop_gadgets(med);
-                    med.repaint_all();
                 }
             }
 
@@ -290,9 +275,6 @@ impl MouseEventSink<()> for ToyBoxApp {
 
                 if (self.hr_cursor_left + 16 <= new_x) && (new_x < self.hr_area.1.0) {
                     self.hr_cursor_right = new_x;
-                    self.draw_rulers(med);
-                    self.draw_prop_gadgets(med);
-                    med.repaint_all();
                 }
             }
 
@@ -301,9 +283,6 @@ impl MouseEventSink<()> for ToyBoxApp {
 
                 if (self.vr_area.0.1 <= new_y) && (new_y < self.vr_cursor_bottom - 16) {
                     self.vr_cursor_top = new_y;
-                    self.draw_rulers(med);
-                    self.draw_prop_gadgets(med);
-                    med.repaint_all();
                 }
             }
 
@@ -312,14 +291,15 @@ impl MouseEventSink<()> for ToyBoxApp {
 
                 if (self.vr_cursor_top + 16 <= new_y) && (new_y < self.vr_area.1.1) {
                     self.vr_cursor_bottom = new_y;
-                    self.draw_rulers(med);
-                    self.draw_prop_gadgets(med);
-                    med.repaint_all();
                 }
             }
 
             _ => (),
         }
+
+        self.draw_rulers(med);
+        self.draw_prop_gadgets(med);
+        med.repaint_all();
     }
 
     fn button_down(&mut self, med: &mut dyn Mediator) {
