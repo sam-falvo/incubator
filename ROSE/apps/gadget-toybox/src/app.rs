@@ -1,7 +1,5 @@
 use stencil::events::{AppController, AppEventSink, MouseEventSink};
 use stencil::mediator::Mediator;
-use stencil::simple_bitmap_font::text_width;
-use stencil::simple_printer::SimplePrinter;
 use stencil::stencil::Draw;
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::types::{Point, Rect, Unit};
@@ -10,6 +8,7 @@ use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::view::{rect_contains, View};
 
 use stencil::gadgets::proportional::{PropGadgetEvent, PropGadgetView};
+use crate::boolean::{PushButtonView, PushButtonEvent};
 
 /// This is the main entry point to all ROSE applications.
 ///
@@ -26,9 +25,8 @@ pub fn init_root(med: &mut dyn Mediator) -> Box<dyn AppController> {
 /// The application state,
 /// which directly or indirectly
 /// includes all models and views on those models.
-pub struct ToyBoxApp {
+pub struct ToyBoxApp<'l, 'f> {
     dbox_area: Rect,
-    quit_area: Rect,
     mouse_pt: Point,
     selected: Selectable,
     hr_area: Rect,
@@ -40,6 +38,7 @@ pub struct ToyBoxApp {
     hprop: PropGadgetView,
     vprop: PropGadgetView,
     xyprop: PropGadgetView,
+    quit_btn: PushButtonView<'l, 'f>,
 }
 
 /// This toybox application
@@ -51,19 +50,17 @@ pub struct ToyBoxApp {
 /// This enumeration identifies those individual parts.
 enum Selectable {
     None,
-    QuitButton,
     LeftRulerKnob,
     RightRulerKnob,
     TopRulerKnob,
     BottomRulerKnob,
 }
 
-impl ToyBoxApp {
+impl<'l, 'f> ToyBoxApp<'l, 'f> {
     /// Provides the application state with default values.
     pub fn new() -> Self {
         Self {
             dbox_area: ((8, 8), (240, 192)),
-            quit_area: ((248, 8), (312, 28)),
             mouse_pt: (0, 0),
             selected: Selectable::None,
             hr_area: ((16, 16), (202, 24)),
@@ -75,6 +72,11 @@ impl ToyBoxApp {
             hprop: PropGadgetView::new(((16, 30), (202, 38))),
             vprop: PropGadgetView::new(((210, 46), (218, 184))),
             xyprop: PropGadgetView::new(((16, 46), (202, 184))),
+            quit_btn: PushButtonView::new(
+                ((248, 8), (312, 28)),
+                "Quit",
+                &SYSTEM_BITMAP_FONT,
+            ),
         }
     }
 
@@ -83,7 +85,7 @@ impl ToyBoxApp {
         draw_desktop(med.borrow_mut_desktop());
 
         // Draw the quit button
-        draw_button(med, self.quit_area, "Quit");
+        self.quit_btn.draw(med);
 
         // Draw the window in which our prop gadgets will sit.
         draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
@@ -172,58 +174,11 @@ impl ToyBoxApp {
     }
 }
 
-// TODO: Promote this to standard API somewhere.
-fn draw_button(med: &mut dyn Mediator, area: Rect, label: &str) {
-    let d = med.borrow_mut_desktop();
-    let font = &SYSTEM_BITMAP_FONT;
-
-    let ((btn_left, btn_top), (btn_right, btn_bottom)) = area;
-    let border_left = btn_left;
-    let border_top = btn_top;
-    let border_right = btn_right - 1;
-    let border_bottom = btn_bottom - 1;
-
-    let r_shadow_left = btn_right - 1;
-    let r_shadow_top = btn_top + 1;
-    let r_shadow_bottom = btn_bottom;
-
-    let b_shadow_left = btn_left + 1;
-    let b_shadow_top = btn_bottom - 1;
-    let b_shadow_right = btn_right;
-
-    let subview_left = btn_left;
-    let subview_top = btn_top;
-    let subview_right = btn_right - 1;
-    let subview_bottom = btn_bottom - 1;
-
-    let label_width = text_width(label, &font);
-    let btn_width = subview_right - subview_left;
-    let label_left = ((btn_width - label_width) >> 1) + btn_left;
-    let label_top = subview_top + font.baseline;
-    let label_region = ((label_left, label_top), (subview_right, subview_bottom));
-
-    d.filled_rectangle(
-        (subview_left, subview_top),
-        (subview_right, subview_bottom),
-        &WHITE_PATTERN,
-    );
-    d.framed_rectangle(
-        (border_left, border_top),
-        (border_right, border_bottom),
-        LINE_BLACK,
-    );
-    d.horizontal_line((b_shadow_left, b_shadow_top), b_shadow_right, LINE_BLACK);
-    d.vertical_line((r_shadow_left, r_shadow_top), r_shadow_bottom, LINE_BLACK);
-
-    let mut p = SimplePrinter::new(d, label_region, &font);
-    p.print(label);
-}
-
 /// Tell the host environment that we are equipped to represent the whole application.
-impl AppController for ToyBoxApp {}
+impl<'l, 'f> AppController for ToyBoxApp<'l, 'f> {}
 
 /// Tell the host environment we can determine the application life-cycle.
-impl AppEventSink for ToyBoxApp {
+impl<'l, 'f> AppEventSink for ToyBoxApp<'l, 'f> {
     fn request_quit(&self) -> bool {
         // We have no reason to deny quitting, so yes.
         true
@@ -231,7 +186,7 @@ impl AppEventSink for ToyBoxApp {
 }
 
 /// Sink for host environment mouse events.
-impl MouseEventSink<()> for ToyBoxApp {
+impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
     fn pointer_moved(&mut self, med: &mut dyn Mediator, pt: Point) {
         self.mouse_pt = pt;
 
@@ -265,6 +220,8 @@ impl MouseEventSink<()> for ToyBoxApp {
 
             _ => (),
         }
+
+        let _ = self.quit_btn.pointer_moved(med, pt);
 
         // Now let's consider pointer motion events for what the user
         // thinks are custom gadgets.
@@ -316,15 +273,11 @@ impl MouseEventSink<()> for ToyBoxApp {
         let _ = self.xyprop.button_down(med);
         let _ = self.vprop.button_down(med);
         let _ = self.hprop.button_down(med);
+        let _ = self.quit_btn.button_down(med);
 
         // Handle button events for the custom gadgets.
 
-        if rect_contains(self.quit_area, self.mouse_pt) {
-            self.selected = Selectable::QuitButton;
-            med.borrow_mut_desktop()
-                .invert_rectangle(self.quit_area.0, self.quit_area.1);
-            med.repaint_all();
-        } else if self.mouse_in_hr_left_cursor() {
+        if self.mouse_in_hr_left_cursor() {
             self.selected = Selectable::LeftRulerKnob;
         } else if self.mouse_in_hr_right_cursor() {
             self.selected = Selectable::RightRulerKnob;
@@ -342,20 +295,15 @@ impl MouseEventSink<()> for ToyBoxApp {
         let _ = self.vprop.button_up(med);
         let _ = self.hprop.button_up(med);
 
-        // Handle button events for the custom gadgets.
-
-        match self.selected {
-            Selectable::QuitButton => {
-                med.borrow_mut_desktop()
-                    .invert_rectangle(self.quit_area.0, self.quit_area.1);
-                med.repaint_all();
-                if rect_contains(self.quit_area, self.mouse_pt) {
-                    med.quit();
-                }
+        match self.quit_btn.button_up(med) {
+            PushButtonEvent::Clicked => {
+                med.quit();
             }
-
             _ => (),
         }
+
+        // Handle button events for the custom gadgets.
+
         self.selected = Selectable::None;
     }
 
@@ -363,16 +311,18 @@ impl MouseEventSink<()> for ToyBoxApp {
         let _ = self.xyprop.enter(med, at);
         let _ = self.vprop.enter(med, at);
         let _ = self.hprop.enter(med, at);
+        let _ = self.quit_btn.enter(med, at);
     }
 
     fn leave(&mut self, med: &mut dyn Mediator) {
         let _ = self.xyprop.leave(med);
         let _ = self.vprop.leave(med);
         let _ = self.hprop.leave(med);
+        let _ = self.quit_btn.leave(med);
     }
 }
 
-impl ToyBoxApp {
+impl<'l, 'f> ToyBoxApp<'l, 'f> {
     fn mouse_in_hr_left_cursor(&self) -> bool {
         let cursor_left = self.hr_cursor_left;
         let cursor_top = self.hr_area.0 .1;
