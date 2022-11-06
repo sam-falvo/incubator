@@ -2,7 +2,6 @@ use stencil::utils::{draw_desktop, draw_dialog_box};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::stencil::Stencil;
 use stencil::stencil::Draw;
-use stencil::stencil::Pattern;
 use stencil::types::{Dimension, Point, Rect, Unit};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::simple_bitmap_font::SimpleBitmapFont;
@@ -47,16 +46,14 @@ pub struct ToyBoxApp {
     dbox_area: Rect,
     quit_area: Rect,
     mouse_pt: Point,
-    track_pt: Point,
     selected: Selectable,
     hr_area: Rect,
     hr_cursor_left: Unit,
     hr_cursor_right: Unit,
-    hprop_area: Rect,
-    hprop_knob_area: Rect,
     vr_area: Rect,
     vr_cursor_top: Unit,
     vr_cursor_bottom: Unit,
+    hprop: proportional::Model,
     vprop: proportional::Model,
     xyprop: proportional::Model,
 }
@@ -66,21 +63,9 @@ enum Selectable {
     QuitButton,
     LeftRulerKnob,
     RightRulerKnob,
-    HPropKnob,
     TopRulerKnob,
     BottomRulerKnob,
 }
-
-static PROP_TRACK_PATTERN: Pattern = [
-    0b11101110,
-    0b11011101,
-    0b10111011,
-    0b01110111,
-    0b11101110,
-    0b11011101,
-    0b10111011,
-    0b01110111,
-];
 
 impl ToyBoxApp {
     pub fn new() -> Self {
@@ -88,16 +73,14 @@ impl ToyBoxApp {
             dbox_area: ((8, 8),(240, 192)),
             quit_area: ((248, 8), (312, 28)),
             mouse_pt: (0, 0),
-            track_pt: (0, 0),
             selected: Selectable::None,
             hr_area: ((16, 16), (202, 24)),
             hr_cursor_left: 16,
             hr_cursor_right: 201,
-            hprop_area: ((14, 28), (204, 40)),
-            hprop_knob_area: ((0, 0), (0, 0)), // Computed later.
             vr_area: ((224, 46), (232, 184)),
             vr_cursor_top: 46,
             vr_cursor_bottom: 183,
+            hprop: proportional::Model::new(((16, 30), (202, 38))),
             vprop: proportional::Model::new(((210, 46), (218, 184))),
             xyprop: proportional::Model::new(((16, 46), (202, 184))),
         }
@@ -116,32 +99,14 @@ impl ToyBoxApp {
     }
 
     fn draw_prop_gadgets(&mut self, med: &mut dyn Mediator) {
-        self.draw_h_prop_gadget(med);
+        self.hprop.set_knob(((self.hr_cursor_left, 30), (self.hr_cursor_right + 1, 38)));
+        self.hprop.draw(med);
 
         self.vprop.set_knob(((210, self.vr_cursor_top), (218, self.vr_cursor_bottom + 1)));
         self.vprop.draw(med);
 
         self.xyprop.set_knob(((self.hr_cursor_left, self.vr_cursor_top), (self.hr_cursor_right + 1, self.vr_cursor_bottom + 1)));
         self.xyprop.draw(med);
-    }
-
-    fn draw_h_prop_gadget(&mut self, med: &mut dyn Mediator) {
-        self.recalculate_h_prop_knob();
-
-        let d = med.borrow_mut_desktop();
-        d.filled_rectangle(self.hprop_area.0, self.hprop_area.1, &PROP_TRACK_PATTERN);
-        d.framed_rectangle(self.hprop_area.0, self.hprop_area.1, LINE_BLACK);
-        d.filled_rectangle(self.hprop_knob_area.0, self.hprop_knob_area.1, &WHITE_PATTERN);
-        d.framed_rectangle(self.hprop_knob_area.0, self.hprop_knob_area.1, LINE_BLACK);
-    }
-
-    fn recalculate_h_prop_knob(&mut self) {
-        let left = self.hr_cursor_left;
-        let right = self.hr_cursor_right + 1;
-        let top = self.hprop_area.0.1 + 2;
-        let bottom = self.hprop_area.1.1 - 2;
-
-        self.hprop_knob_area = ((left, top), (right, bottom));
     }
 
     fn draw_rulers(&mut self, med: &mut dyn Mediator) {
@@ -295,6 +260,19 @@ impl MouseEventSink<()> for ToyBoxApp {
             _ => (),
         }
 
+        match self.hprop.pointer_moved(med, pt) {
+            PropGadgetEvent::KnobMoved(r) => {
+                self.hr_cursor_left = r.0.0;
+                self.hr_cursor_right = r.1.0 - 1;
+
+                self.draw_rulers(med);
+                self.draw_prop_gadgets(med);
+                med.repaint_all();
+            },
+
+            _ => (),
+        }
+
         match self.selected {
             Selectable::LeftRulerKnob => {
                 let new_x = pt.0;
@@ -316,33 +294,6 @@ impl MouseEventSink<()> for ToyBoxApp {
                     self.draw_prop_gadgets(med);
                     med.repaint_all();
                 }
-            }
-
-            Selectable::HPropKnob => {
-                let dx = self.mouse_pt.0 - self.track_pt.0;
-                let track_left = self.hprop_area.0.0 + 2;
-                let track_right = self.hprop_area.1.0 - 3; // inclusive coordinate
-
-                let new_left = self.hr_cursor_left + dx;
-                let new_right = self.hr_cursor_right + dx;
-
-                // constraint_left goes positive if there's a correction to be made.
-                let constraint_left = (track_left - new_left).max(0);
-                let new_left = new_left + constraint_left;
-                let new_right = new_right + constraint_left;
-
-                // constraint_right goes negative if there's a correction to be made.
-                let constraint_right = (track_right - new_right).min(0);
-                let new_left = new_left + constraint_right;
-                let new_right = new_right + constraint_right;
-
-                self.hr_cursor_left = new_left;
-                self.hr_cursor_right = new_right;
-                self.draw_prop_gadgets(med);
-                self.draw_rulers(med);
-                med.repaint_all();
-
-                self.track_pt = self.mouse_pt;
             }
 
             Selectable::TopRulerKnob => {
@@ -374,6 +325,7 @@ impl MouseEventSink<()> for ToyBoxApp {
     fn button_down(&mut self, med: &mut dyn Mediator) {
         let _ = self.xyprop.button_down(med);
         let _ = self.vprop.button_down(med);
+        let _ = self.hprop.button_down(med);
 
         if rect_contains(self.quit_area, self.mouse_pt) {
             self.selected = Selectable::QuitButton;
@@ -383,9 +335,6 @@ impl MouseEventSink<()> for ToyBoxApp {
             self.selected = Selectable::LeftRulerKnob;
         } else if self.mouse_in_hr_right_cursor() {
             self.selected = Selectable::RightRulerKnob;
-        } else if self.mouse_in_h_knob() {
-            self.selected = Selectable::HPropKnob;
-            self.track_pt = self.mouse_pt;
         } else if self.mouse_in_vr_top_cursor() {
             self.selected = Selectable::TopRulerKnob;
         } else if self.mouse_in_vr_bottom_cursor() {
@@ -396,6 +345,7 @@ impl MouseEventSink<()> for ToyBoxApp {
     fn button_up(&mut self, med: &mut dyn Mediator) {
         let _ = self.xyprop.button_up(med);
         let _ = self.vprop.button_up(med);
+        let _ = self.hprop.button_up(med);
 
         match self.selected {
             Selectable::QuitButton => {
@@ -444,10 +394,6 @@ impl ToyBoxApp {
 
         let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
         rect_contains(cursor_area, self.mouse_pt)
-    }
-
-    fn mouse_in_h_knob(&self) -> bool {
-        rect_contains(self.hprop_knob_area, self.mouse_pt)
     }
 
     fn mouse_in_vr_top_cursor(&self) -> bool {
