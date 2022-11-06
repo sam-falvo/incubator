@@ -7,8 +7,7 @@ use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
 use stencil::simple_bitmap_font::SimpleBitmapFont;
 use stencil::simple_printer::SimplePrinter;
 
-use crate::proportional;
-use crate::proportional::PropGadgetEvent;
+use crate::proportional::{PropGadgetView, PropGadgetEvent};
 
 pub trait AppController: MouseEventSink<()> + AppEventSink {}
 
@@ -53,9 +52,9 @@ pub struct ToyBoxApp {
     vr_area: Rect,
     vr_cursor_top: Unit,
     vr_cursor_bottom: Unit,
-    hprop: proportional::Model,
-    vprop: proportional::Model,
-    xyprop: proportional::Model,
+    hprop: PropGadgetView,
+    vprop: PropGadgetView,
+    xyprop: PropGadgetView,
 }
 
 enum Selectable {
@@ -80,9 +79,9 @@ impl ToyBoxApp {
             vr_area: ((224, 46), (232, 184)),
             vr_cursor_top: 46,
             vr_cursor_bottom: 183,
-            hprop: proportional::Model::new(((16, 30), (202, 38))),
-            vprop: proportional::Model::new(((210, 46), (218, 184))),
-            xyprop: proportional::Model::new(((16, 46), (202, 184))),
+            hprop: PropGadgetView::new(((16, 30), (202, 38))),
+            vprop: PropGadgetView::new(((210, 46), (218, 184))),
+            xyprop: PropGadgetView::new(((16, 46), (202, 184))),
         }
     }
 
