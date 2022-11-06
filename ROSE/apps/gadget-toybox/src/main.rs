@@ -9,7 +9,8 @@ use sdl2::mouse::MouseButton;
 use sdlstate::SdlState;
 use stencil::types::{Dimension, Unit};
 use stencil::stencil::{Stencil, Draw};
-use app::{init_root, Mediator};
+use stencil::mediator::Mediator;
+use app::init_root;
 
 fn main() {
     // Create the SDL bindings.

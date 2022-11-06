@@ -22,8 +22,9 @@ use stencil::types::{Rect, Point};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::stencil::{Draw, Pattern};
 
-use crate::app::{Mediator, View, MouseEventSink};
-use crate::app::rect_contains;
+use stencil::events::MouseEventSink;
+use stencil::mediator::Mediator;
+use stencil::view::{View, rect_contains};
 
 /// This is the 8x8 pixel pattern used to draw a proportional gadget's track.
 pub static PROP_TRACK_PATTERN: Pattern = [

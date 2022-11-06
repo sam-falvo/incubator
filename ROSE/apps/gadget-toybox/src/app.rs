@@ -1,46 +1,31 @@
 use stencil::utils::{draw_desktop, draw_dialog_box};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
-use stencil::stencil::Stencil;
 use stencil::stencil::Draw;
-use stencil::types::{Dimension, Point, Rect, Unit};
+use stencil::types::{Point, Rect, Unit};
 use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
-use stencil::simple_bitmap_font::SimpleBitmapFont;
+use stencil::simple_bitmap_font::text_width;
 use stencil::simple_printer::SimplePrinter;
+use stencil::events::{MouseEventSink, AppEventSink, AppController};
+use stencil::view::{View, rect_contains};
+use stencil::mediator::Mediator;
 
 use crate::proportional::{PropGadgetView, PropGadgetEvent};
 
-pub trait AppController: MouseEventSink<()> + AppEventSink {}
-
-pub trait AppEventSink {
-    fn request_quit(&self) -> bool;
-}
-
-pub trait MouseEventSink<T> {
-    fn pointer_moved(&mut self, med: &mut dyn Mediator, to: Point) -> T;
-    fn button_up(&mut self, med: &mut dyn Mediator) -> T;
-    fn button_down(&mut self, med: &mut dyn Mediator) -> T;
-    fn enter(&mut self, med: &mut dyn Mediator, at: Point) -> T;
-    fn leave(&mut self, med: &mut dyn Mediator) -> T;
-}
-
-pub trait Mediator {
-    fn repaint_all(&mut self);
-    fn quit(&mut self);
-    fn borrow_mut_desktop(&mut self) -> &mut Stencil;
-}
-
-pub trait View {
-    fn draw(&mut self, med: &mut dyn Mediator);
-}
-
-// ------------------------------------------------------------------------
-
+/// This is the main entry point to all ROSE applications.
+///
+/// It constructs a structure representing the total application state,
+/// and returns it to the host environment's event loop.
+///
+/// It also renders the initial desktop image.
 pub fn init_root(med: &mut dyn Mediator) -> Box<dyn AppController> {
     let mut toybox = Box::new(ToyBoxApp::new());
     toybox.draw(med);
     Box::new(ToyBoxApp::new())
 }
 
+/// The application state,
+/// which directly or indirectly
+/// includes all models and views on those models.
 pub struct ToyBoxApp {
     dbox_area: Rect,
     quit_area: Rect,
@@ -57,6 +42,13 @@ pub struct ToyBoxApp {
     xyprop: PropGadgetView,
 }
 
+/// This toybox application
+/// includes a number of custom gadgets
+/// that don't exist in the standard library.
+/// We need to keep track of
+/// which parts of which gadgets
+/// the user is currently interacting with.
+/// This enumeration identifies those individual parts.
 enum Selectable {
     None,
     QuitButton,
@@ -67,6 +59,7 @@ enum Selectable {
 }
 
 impl ToyBoxApp {
+    /// Provides the application state with default values.
     pub fn new() -> Self {
         Self {
             dbox_area: ((8, 8),(240, 192)),
@@ -85,6 +78,7 @@ impl ToyBoxApp {
         }
     }
 
+    /// Draws the entire application state onto the screen.
     fn draw(&mut self, med: &mut dyn Mediator) {
         draw_desktop(med.borrow_mut_desktop());
 
@@ -93,8 +87,12 @@ impl ToyBoxApp {
 
         // Draw the window in which our prop gadgets will sit.
         draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
+
+        // Draw the custom and standard gadgets.
         self.draw_rulers(med);
         self.draw_prop_gadgets(med);
+
+        med.repaint_all();
     }
 
     fn draw_prop_gadgets(&mut self, med: &mut dyn Mediator) {
@@ -190,36 +188,12 @@ fn draw_button(med: &mut dyn Mediator, area: Rect, label: &str) {
 
     let mut p = SimplePrinter::new(d, label_region, &font);
     p.print(label);
-
-    med.repaint_all();
 }
 
-// TODO: Promote this to standard API somewhere.
-fn text_width(text: &str, font: &SimpleBitmapFont) -> Dimension {
-    text.bytes().map(|b| {
-        // If not representable in the glyph set of the font, assume the undefined character glyph,
-        // which by definition, is always at highest_char+1 mod 256.
-        let highest_character = font.highest_char;
-        let lowest_character = font.lowest_char;
-        let mut glyph_index = b as usize;
-
-        if (b < lowest_character) || (b > highest_character) {
-            glyph_index = (highest_character as usize).overflowing_add(1).0;
-        }
-        glyph_index -= lowest_character as usize;
-
-        // Let's expand this to a valid array index.
-
-        let left_edge = font.left_edges[glyph_index];
-        let right_edge = font.left_edges[glyph_index + 1];
-        let glyph_width = right_edge - left_edge;
-
-        glyph_width as Dimension
-    }).sum()
-}
-
+/// Tell the host environment that we are equipped to represent the whole application.
 impl AppController for ToyBoxApp { }
 
+/// Tell the host environment we can determine the application life-cycle.
 impl AppEventSink for ToyBoxApp {
     fn request_quit(&self) -> bool {
         // We have no reason to deny quitting, so yes.
@@ -227,9 +201,12 @@ impl AppEventSink for ToyBoxApp {
     }
 }
 
+/// Sink for host environment mouse events.
 impl MouseEventSink<()> for ToyBoxApp {
     fn pointer_moved(&mut self, med: &mut dyn Mediator, pt: Point) {
         self.mouse_pt = pt;
+
+        // Let the gadgets handle their own pointer motion events.
 
         match self.xyprop.pointer_moved(med, pt) {
             PropGadgetEvent::KnobMoved(r) => {
@@ -259,6 +236,9 @@ impl MouseEventSink<()> for ToyBoxApp {
 
             _ => (),
         }
+
+        // Now let's consider pointer motion events for what the user
+        // thinks are custom gadgets.
 
         match self.selected {
             Selectable::LeftRulerKnob => {
@@ -302,9 +282,13 @@ impl MouseEventSink<()> for ToyBoxApp {
     }
 
     fn button_down(&mut self, med: &mut dyn Mediator) {
+        // Handle button events for the regular gadgets.
+
         let _ = self.xyprop.button_down(med);
         let _ = self.vprop.button_down(med);
         let _ = self.hprop.button_down(med);
+
+        // Handle button events for the custom gadgets.
 
         if rect_contains(self.quit_area, self.mouse_pt) {
             self.selected = Selectable::QuitButton;
@@ -322,9 +306,13 @@ impl MouseEventSink<()> for ToyBoxApp {
     }
 
     fn button_up(&mut self, med: &mut dyn Mediator) {
+        // Handle button events for the regular gadgets.
+
         let _ = self.xyprop.button_up(med);
         let _ = self.vprop.button_up(med);
         let _ = self.hprop.button_up(med);
+
+        // Handle button events for the custom gadgets.
 
         match self.selected {
             Selectable::QuitButton => {
@@ -340,18 +328,17 @@ impl MouseEventSink<()> for ToyBoxApp {
         self.selected = Selectable::None;
     }
 
-    fn enter(&mut self, _: &mut dyn Mediator, _: Point) {
+    fn enter(&mut self, med: &mut dyn Mediator, at: Point) {
+        let _ = self.xyprop.enter(med, at);
+        let _ = self.vprop.enter(med, at);
+        let _ = self.hprop.enter(med, at);
     }
 
-    fn leave(&mut self, _: &mut dyn Mediator) {
+    fn leave(&mut self, med: &mut dyn Mediator) {
+        let _ = self.xyprop.leave(med);
+        let _ = self.vprop.leave(med);
+        let _ = self.hprop.leave(med);
     }
-}
-
-pub fn rect_contains(r: Rect, p: Point) -> bool {
-    let ((left, top), (right, bottom)) = r;
-    let (x, y) = p;
-
-    (left <= x) && (x < right) && (top <= y) && (y < bottom)
 }
 
 impl ToyBoxApp {
