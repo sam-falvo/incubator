@@ -1,4 +1,4 @@
-//! Support for *proportional* gadgets.
+//! Support for proportional gadgets.
 //!
 //! Documentation TBD.
 
@@ -9,7 +9,7 @@ use stencil::stencil::{Draw, Pattern};
 use crate::app::{Mediator, View, MouseEventSink};
 use crate::app::rect_contains;
 
-static PROP_TRACK_PATTERN: Pattern = [
+pub static PROP_TRACK_PATTERN: Pattern = [
     0b11101110,
     0b11011101,
     0b10111011,
@@ -19,10 +19,6 @@ static PROP_TRACK_PATTERN: Pattern = [
     0b10111011,
     0b01110111,
 ];
-
-// ------------------------------------------------------------------------
-// Model
-// ------------------------------------------------------------------------
 
 /// Maintains the state of a proportional gadget.
 pub struct Model {
@@ -49,6 +45,8 @@ impl Model {
     /// the largest rectangle the knob can occupy.
     /// By default, the knob will occupy the entire track.
     /// The borders for the gadget will surround the track rectangle.
+    ///
+    /// Use [[set_knob]] to set the knob size and position within the `track` rectangle.
     pub fn new(track: Rect) -> Self {
         Self {
             track,
@@ -66,10 +64,13 @@ impl Model {
 
     /// Sets the knob rectangle.
     ///
-    /// The knob must be a sub-rectangle of the `track`.
-    /// If it is not, weird behavior will ensue.
+    /// The knob rectangle `k` will be clipped to the area set by the gadget's track.
     pub fn set_knob(&mut self, k: Rect) {
-        self.knob = k;
+        let ((left, top), (right, bottom)) = k;
+        self.knob = (
+            (left.max(self.track.0.0), top.max(self.track.0.1)),
+            (right.min(self.track.1.0), bottom.min(self.track.1.1))
+        );
     }
 }
 
