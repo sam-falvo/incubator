@@ -1,6 +1,22 @@
 //! Support for proportional gadgets.
 //!
-//! Documentation TBD.
+//! Proportional gadgets are used
+//! whenever you need
+//! analog input from a user.
+//! For example,
+//! three proportional gadgets
+//! can be used
+//! to implement a red/green/blue color selector.
+//!
+//! They can also be used to
+//! allow a user to scroll a viewport
+//! over a document
+//! too large to display all at once.
+//!
+//! The proportional gadgets
+//! supported in this module
+//! are largely inspired
+//! by those found in AmigaOS' Intuition library.
 
 use stencil::types::{Rect, Point};
 use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
@@ -9,6 +25,7 @@ use stencil::stencil::{Draw, Pattern};
 use crate::app::{Mediator, View, MouseEventSink};
 use crate::app::rect_contains;
 
+/// This is the 8x8 pixel pattern used to draw a proportional gadget's track.
 pub static PROP_TRACK_PATTERN: Pattern = [
     0b11101110,
     0b11011101,
@@ -20,8 +37,8 @@ pub static PROP_TRACK_PATTERN: Pattern = [
     0b01110111,
 ];
 
-/// Maintains the state of a proportional gadget.
-pub struct Model {
+/// Maintains the appearance of a proportional gadget.
+pub struct PropGadgetView {
     /// The rectangle describing the track of the proportional gadget.
     /// **Note:** When rendering the proportional gadget, there will be a
     /// border surrounding the track.  The `track` rectangle *does not*
@@ -39,14 +56,14 @@ pub struct Model {
     mouse_pt: Point,
 }
 
-impl Model {
+impl PropGadgetView {
     /// Creates a new proportional gadget model.
     /// The `track` rectangle defines
     /// the largest rectangle the knob can occupy.
     /// By default, the knob will occupy the entire track.
     /// The borders for the gadget will surround the track rectangle.
     ///
-    /// Use [[set_knob]] to set the knob size and position within the `track` rectangle.
+    /// Use [[PropGadgetView::set_knob]] to set the knob size and position within the `track` rectangle.
     pub fn new(track: Rect) -> Self {
         Self {
             track,
@@ -72,14 +89,41 @@ impl Model {
             (right.min(self.track.1.0), bottom.min(self.track.1.1))
         );
     }
+
+    /// Retrieves the current knob rectangle.
+    pub fn get_knob(&self) -> Rect {
+        self.knob
+    }
+
+    /// Retrieves the track rectangle.
+    pub fn get_track(&self) -> Rect {
+        self.track
+    }
 }
 
+/// Events unique to the proportional gadget.
 pub enum PropGadgetEvent {
+    /// No event recognized.
     None,
+
+    /// The user has performed an action which requests the knob be moved
+    /// to a new location.  Use [[PropGadgetView::set_knob]] to acknowledge
+    /// the movement.
     KnobMoved(Rect),
 }
 
-impl MouseEventSink<PropGadgetEvent> for Model {
+impl MouseEventSink<PropGadgetEvent> for PropGadgetView {
+    /// Handle mouse motion events.
+    ///
+    /// If the user is currently moving the knob of the gadget,
+    /// [[PropGadgetEvent::KnobMoved]] events will be returned.
+    /// **NOTE:** This *will not* update the knob position.
+    /// You will still be responsible for calling [[PropGadgetView::set_knob]]
+    /// in response to this event.  This gives the application
+    /// a chance to filter and/or react to the event before
+    /// updating the gadget's knob.
+    ///
+    /// Otherwise, [[PropGadgetEvent::None]] is returned.
     fn pointer_moved(&mut self, _med: &mut dyn Mediator, to: Point) -> PropGadgetEvent {
         let mut evt = PropGadgetEvent::None;
         if self.grabbed {
@@ -123,11 +167,17 @@ impl MouseEventSink<PropGadgetEvent> for Model {
         evt
     }
 
+    /// Handles mouse button-up events.
+    ///
+    /// Currently, always answers with [[PropGadgetEvent::None]].
     fn button_up(&mut self, _med: &mut dyn Mediator) -> PropGadgetEvent {
         self.grabbed = false;
         PropGadgetEvent::None
     }
 
+    /// Handles mouse button-down events.
+    ///
+    /// Currently, always answers with [[PropGadgetEvent::None]].
     fn button_down(&mut self, _med: &mut dyn Mediator) -> PropGadgetEvent {
         if self.point_in_knob() {
             self.grabbed = true;
@@ -135,16 +185,24 @@ impl MouseEventSink<PropGadgetEvent> for Model {
         PropGadgetEvent::None
     }
 
+    /// Handles mouse entry events.
+    ///
+    /// Currently, always answers with [[PropGadgetEvent::None]].
     fn enter(&mut self, _med: &mut dyn Mediator, _at: Point) -> PropGadgetEvent {
         PropGadgetEvent::None
     }
 
+    /// Handles mouse button-down events.
+    ///
+    /// Currently, always answers with [[PropGadgetEvent::None]].
     fn leave(&mut self, _med: &mut dyn Mediator) -> PropGadgetEvent {
         PropGadgetEvent::None
     }
 }
 
-impl View for Model {
+impl View for PropGadgetView {
+    // ISSUE: Should we just pass in a &mut Stencil here?  Or &mut dyn Draw?
+    /// Draws the proportional gadget on the desktop stencil associated with the mediator `med`.
     fn draw(&mut self, med: &mut dyn Mediator) {
         let d = med.borrow_mut_desktop();
         let border = ((self.track.0.0 - 2, self.track.0.1 - 2),
