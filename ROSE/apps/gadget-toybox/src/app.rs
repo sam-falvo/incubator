@@ -57,8 +57,7 @@ pub struct ToyBoxApp {
     vr_area: Rect,
     vr_cursor_top: Unit,
     vr_cursor_bottom: Unit,
-    vprop_area: Rect,
-    vprop_knob_area: Rect,
+    vprop: proportional::Model,
     xyprop: proportional::Model,
 }
 
@@ -70,7 +69,6 @@ enum Selectable {
     HPropKnob,
     TopRulerKnob,
     BottomRulerKnob,
-    VPropKnob,
 }
 
 static PROP_TRACK_PATTERN: Pattern = [
@@ -100,8 +98,7 @@ impl ToyBoxApp {
             vr_area: ((224, 46), (232, 184)),
             vr_cursor_top: 46,
             vr_cursor_bottom: 183,
-            vprop_area: ((208, 44), (220, 186)),
-            vprop_knob_area: ((0, 0), (0, 0)), // Computed later.
+            vprop: proportional::Model::new(((210, 46), (218, 184))),
             xyprop: proportional::Model::new(((16, 46), (202, 184))),
         }
     }
@@ -120,7 +117,9 @@ impl ToyBoxApp {
 
     fn draw_prop_gadgets(&mut self, med: &mut dyn Mediator) {
         self.draw_h_prop_gadget(med);
-        self.draw_v_prop_gadget(med);
+
+        self.vprop.set_knob(((210, self.vr_cursor_top), (218, self.vr_cursor_bottom + 1)));
+        self.vprop.draw(med);
 
         self.xyprop.set_knob(((self.hr_cursor_left, self.vr_cursor_top), (self.hr_cursor_right + 1, self.vr_cursor_bottom + 1)));
         self.xyprop.draw(med);
@@ -136,16 +135,6 @@ impl ToyBoxApp {
         d.framed_rectangle(self.hprop_knob_area.0, self.hprop_knob_area.1, LINE_BLACK);
     }
 
-    fn draw_v_prop_gadget(&mut self, med: &mut dyn Mediator) {
-        self.recalculate_v_prop_knob();
-
-        let d = med.borrow_mut_desktop();
-        d.filled_rectangle(self.vprop_area.0, self.vprop_area.1, &PROP_TRACK_PATTERN);
-        d.framed_rectangle(self.vprop_area.0, self.vprop_area.1, LINE_BLACK);
-        d.filled_rectangle(self.vprop_knob_area.0, self.vprop_knob_area.1, &WHITE_PATTERN);
-        d.framed_rectangle(self.vprop_knob_area.0, self.vprop_knob_area.1, LINE_BLACK);
-    }
-
     fn recalculate_h_prop_knob(&mut self) {
         let left = self.hr_cursor_left;
         let right = self.hr_cursor_right + 1;
@@ -153,15 +142,6 @@ impl ToyBoxApp {
         let bottom = self.hprop_area.1.1 - 2;
 
         self.hprop_knob_area = ((left, top), (right, bottom));
-    }
-
-    fn recalculate_v_prop_knob(&mut self) {
-        let top = self.vr_cursor_top;
-        let bottom = self.vr_cursor_bottom + 1;
-        let left = self.vprop_area.0.0 + 2;
-        let right = self.vprop_area.1.0 - 2;
-
-        self.vprop_knob_area = ((left, top), (right, bottom));
     }
 
     fn draw_rulers(&mut self, med: &mut dyn Mediator) {
@@ -302,6 +282,19 @@ impl MouseEventSink<()> for ToyBoxApp {
             _ => (),
         }
 
+        match self.vprop.pointer_moved(med, pt) {
+            PropGadgetEvent::KnobMoved(r) => {
+                self.vr_cursor_top = r.0.1;
+                self.vr_cursor_bottom = r.1.1 - 1;
+
+                self.draw_rulers(med);
+                self.draw_prop_gadgets(med);
+                med.repaint_all();
+            },
+
+            _ => (),
+        }
+
         match self.selected {
             Selectable::LeftRulerKnob => {
                 let new_x = pt.0;
@@ -374,39 +367,13 @@ impl MouseEventSink<()> for ToyBoxApp {
                 }
             }
 
-            Selectable::VPropKnob => {
-                let dy = self.mouse_pt.1 - self.track_pt.1;
-                let track_top = self.vprop_area.0.1 + 2;
-                let track_bottom = self.vprop_area.1.1 - 3; // inclusive coordinate
-
-                let new_top = self.vr_cursor_top + dy;
-                let new_bottom = self.vr_cursor_bottom + dy;
-
-                // constraint_top goes positive if there's a correction to be made.
-                let constraint_top = (track_top - new_top).max(0);
-                let new_top = new_top + constraint_top;
-                let new_bottom = new_bottom + constraint_top;
-
-                // constraint_bottom goes negative if there's a correction to be made.
-                let constraint_bottom = (track_bottom - new_bottom).min(0);
-                let new_top = new_top + constraint_bottom;
-                let new_bottom = new_bottom + constraint_bottom;
-
-                self.vr_cursor_top = new_top;
-                self.vr_cursor_bottom = new_bottom;
-                self.draw_prop_gadgets(med);
-                self.draw_rulers(med);
-                med.repaint_all();
-
-                self.track_pt = self.mouse_pt;
-            }
-
             _ => (),
         }
     }
 
     fn button_down(&mut self, med: &mut dyn Mediator) {
         let _ = self.xyprop.button_down(med);
+        let _ = self.vprop.button_down(med);
 
         if rect_contains(self.quit_area, self.mouse_pt) {
             self.selected = Selectable::QuitButton;
@@ -423,14 +390,12 @@ impl MouseEventSink<()> for ToyBoxApp {
             self.selected = Selectable::TopRulerKnob;
         } else if self.mouse_in_vr_bottom_cursor() {
             self.selected = Selectable::BottomRulerKnob;
-        } else if self.mouse_in_v_knob() {
-            self.selected = Selectable::VPropKnob;
-            self.track_pt = self.mouse_pt;
         }
     }
 
     fn button_up(&mut self, med: &mut dyn Mediator) {
         let _ = self.xyprop.button_up(med);
+        let _ = self.vprop.button_up(med);
 
         match self.selected {
             Selectable::QuitButton => {
@@ -503,10 +468,6 @@ impl ToyBoxApp {
 
         let cursor_area = ((cursor_left, cursor_top), (cursor_right, cursor_bottom));
         rect_contains(cursor_area, self.mouse_pt)
-    }
-
-    fn mouse_in_v_knob(&self) -> bool {
-        rect_contains(self.vprop_knob_area, self.mouse_pt)
     }
 }
 
