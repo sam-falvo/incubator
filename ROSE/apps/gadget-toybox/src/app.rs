@@ -209,29 +209,29 @@ impl MouseEventSink<()> for ToyBoxApp {
         // Let the gadgets handle their own pointer motion events.
 
         match self.xyprop.pointer_moved(med, pt) {
-            PropGadgetEvent::KnobMoved(r) => {
-                self.hr_cursor_left = r.0.0;
-                self.vr_cursor_top = r.0.1;
-                self.hr_cursor_right = r.1.0 - 1;
-                self.vr_cursor_bottom = r.1.1 - 1;
+            PropGadgetEvent::KnobMoved(((left, top), (right, bottom))) => {
+                self.hr_cursor_left = left;
+                self.vr_cursor_top = top;
+                self.hr_cursor_right = right - 1;
+                self.vr_cursor_bottom = bottom - 1;
             },
 
             _ => (),
         }
 
         match self.vprop.pointer_moved(med, pt) {
-            PropGadgetEvent::KnobMoved(r) => {
-                self.vr_cursor_top = r.0.1;
-                self.vr_cursor_bottom = r.1.1 - 1;
+            PropGadgetEvent::KnobMoved(((_, top), (_, bottom))) => {
+                self.vr_cursor_top = top;
+                self.vr_cursor_bottom = bottom - 1;
             },
 
             _ => (),
         }
 
         match self.hprop.pointer_moved(med, pt) {
-            PropGadgetEvent::KnobMoved(r) => {
-                self.hr_cursor_left = r.0.0;
-                self.hr_cursor_right = r.1.0 - 1;
+            PropGadgetEvent::KnobMoved(((left, _), (right, _))) => {
+                self.hr_cursor_left = left;
+                self.hr_cursor_right = right - 1;
             },
 
             _ => (),
