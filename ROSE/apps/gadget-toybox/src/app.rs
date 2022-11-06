@@ -39,6 +39,19 @@ pub struct ToyBoxApp<'l, 'f> {
     vprop: PropGadgetView,
     xyprop: PropGadgetView,
     quit_btn: PushButtonView<'l, 'f>,
+    sel_a: PushButtonView<'l, 'f>,
+    sel_b: PushButtonView<'l, 'f>,
+    sel_c: PushButtonView<'l, 'f>,
+    sel: Selector,
+}
+
+/// Our toggle-buttons implement a kind of "radio button" control.
+/// Only one of three selections are possible.
+/// Selector encodes which selection is currently set.
+enum Selector {
+    OptionA,
+    OptionB,
+    OptionC,
 }
 
 /// This toybox application
@@ -77,6 +90,30 @@ impl<'l, 'f> ToyBoxApp<'l, 'f> {
                 "Quit",
                 &SYSTEM_BITMAP_FONT,
             ),
+            sel_a: PushButtonView::new(
+                ((248, 48), (312, 68)),
+                "Select A",
+                &SYSTEM_BITMAP_FONT,
+            ),
+            sel_b: PushButtonView::new(
+                ((248, 70), (312, 90)),
+                "Select B",
+                &SYSTEM_BITMAP_FONT,
+            ),
+            sel_c: PushButtonView::new(
+                ((248, 92), (312, 112)),
+                "Select C",
+                &SYSTEM_BITMAP_FONT,
+            ),
+            sel: Selector::OptionA,
+        }
+    }
+
+    fn invert_selection(&mut self, med: &mut dyn Mediator) {
+        match self.sel {
+            Selector::OptionA => self.sel_a.invert(med),
+            Selector::OptionB => self.sel_b.invert(med),
+            Selector::OptionC => self.sel_c.invert(med),
         }
     }
 
@@ -86,6 +123,12 @@ impl<'l, 'f> ToyBoxApp<'l, 'f> {
 
         // Draw the quit button
         self.quit_btn.draw(med);
+
+        // Draw the mutually-exclusive set of toggle buttons.
+        self.sel_a.draw(med);
+        self.sel_b.draw(med);
+        self.sel_c.draw(med);
+        self.invert_selection(med);
 
         // Draw the window in which our prop gadgets will sit.
         draw_dialog_box(med.borrow_mut_desktop(), self.dbox_area);
@@ -223,6 +266,10 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
 
         let _ = self.quit_btn.pointer_moved(med, pt);
 
+        let _ = self.sel_a.pointer_moved(med, pt);
+        let _ = self.sel_b.pointer_moved(med, pt);
+        let _ = self.sel_c.pointer_moved(med, pt);
+
         // Now let's consider pointer motion events for what the user
         // thinks are custom gadgets.
 
@@ -275,6 +322,10 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.hprop.button_down(med);
         let _ = self.quit_btn.button_down(med);
 
+        let _ = self.sel_a.button_down(med);
+        let _ = self.sel_b.button_down(med);
+        let _ = self.sel_c.button_down(med);
+
         // Handle button events for the custom gadgets.
 
         if self.mouse_in_hr_left_cursor() {
@@ -302,6 +353,34 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
             _ => (),
         }
 
+        match self.sel_a.button_up(med) {
+            PushButtonEvent::Clicked => {
+                // New setting already highlit; "deselect" old setting.
+                self.invert_selection(med);
+                self.sel = Selector::OptionA;
+                med.repaint_all();
+            }
+            _ => (),
+        }
+
+        match self.sel_b.button_up(med) {
+            PushButtonEvent::Clicked => {
+                self.invert_selection(med);
+                self.sel = Selector::OptionB;
+                med.repaint_all();
+            }
+            _ => (),
+        }
+
+        match self.sel_c.button_up(med) {
+            PushButtonEvent::Clicked => {
+                self.invert_selection(med);
+                self.sel = Selector::OptionC;
+                med.repaint_all();
+            }
+            _ => (),
+        }
+
         // Handle button events for the custom gadgets.
 
         self.selected = Selectable::None;
@@ -312,6 +391,9 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.vprop.enter(med, at);
         let _ = self.hprop.enter(med, at);
         let _ = self.quit_btn.enter(med, at);
+        let _ = self.sel_a.enter(med, at);
+        let _ = self.sel_b.enter(med, at);
+        let _ = self.sel_c.enter(med, at);
     }
 
     fn leave(&mut self, med: &mut dyn Mediator) {
@@ -319,6 +401,9 @@ impl<'l, 'f> MouseEventSink<()> for ToyBoxApp<'l, 'f> {
         let _ = self.vprop.leave(med);
         let _ = self.hprop.leave(med);
         let _ = self.quit_btn.leave(med);
+        let _ = self.sel_a.leave(med);
+        let _ = self.sel_b.leave(med);
+        let _ = self.sel_c.leave(med);
     }
 }
 
