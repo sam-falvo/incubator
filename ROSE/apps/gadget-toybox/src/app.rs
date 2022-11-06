@@ -8,7 +8,7 @@ use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
 use stencil::view::{rect_contains, View};
 
 use stencil::gadgets::proportional::{PropGadgetEvent, PropGadgetView};
-use crate::boolean::{PushButtonView, PushButtonEvent};
+use stencil::gadgets::boolean::{PushButtonView, PushButtonEvent};
 
 /// This is the main entry point to all ROSE applications.
 ///

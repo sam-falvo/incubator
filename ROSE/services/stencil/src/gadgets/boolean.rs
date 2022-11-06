@@ -1,14 +1,14 @@
 //! Support for boolean gadgets.
 
-use stencil::mediator::Mediator;
-use stencil::types::{Point, Rect};
-use stencil::view::{View, rect_contains};
-use stencil::events::MouseEventSink;
-use stencil::simple_printer::SimplePrinter;
-use stencil::utils::{LINE_BLACK, WHITE_PATTERN};
-use stencil::simple_bitmap_font::{SimpleBitmapFont, text_width};
-use stencil::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
-use stencil::stencil::Draw;
+use crate::mediator::Mediator;
+use crate::types::{Point, Rect};
+use crate::view::{View, rect_contains};
+use crate::events::MouseEventSink;
+use crate::simple_printer::SimplePrinter;
+use crate::utils::{LINE_BLACK, WHITE_PATTERN};
+use crate::simple_bitmap_font::{SimpleBitmapFont, text_width};
+use crate::sysfont_bsw_9::SYSTEM_BITMAP_FONT;
+use crate::stencil::Draw;
 
 /// Maintains the appearance of a boolean gadget.
 ///

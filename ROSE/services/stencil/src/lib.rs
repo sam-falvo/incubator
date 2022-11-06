@@ -11,4 +11,5 @@ pub mod mediator;
 
 pub mod gadgets {
     pub mod proportional;
+    pub mod boolean;
 }
