@@ -1,3 +1,10 @@
+; vim:ts=16:sw=16:noet:ai: 
+; xa -w -M boot.asm -o boot
+;
+;	Hardware Abstraction Layer - RISC-V RV32I Virtual Machine Monitor
+;	Copyright 2023 Samuel A. Falvo II
+;
+
 	*=$C000
 
 ;=======================================================================
@@ -131,3 +138,49 @@
 	ply
 	plx
 	rts
+
+;=======================================================================
+;	JSR PrintInline
+;	.BYT "Hello world",13,0
+;
+; Prints a string encoded after the JSR to the current output device
+; using myCHROUT.
+;
+; Errors are ignored.
+;
+; Preparation:
+;   Registers:	A must be 16-bits wide.
+;   Memory:	Nucleus configuration.
+;   Calls:	Same as CHROUT.  Must be calling from bank 0.
+;
+; Results:
+;   Registers:	A used.
+;   Flags:	none.
+;   Memory:	STATUS, RSSTAT updated
+;
+;=======================================================================
+
++PrintInline:	phx
+	phy
+	php
+.(
+	_AXL
+	lda 6,s
+	tax
+	_AS
+again:	lda !1,x	; X=ptr-1, so use 1,X to get next byte.
+	beq onNull
+	jsr myCHROUT
+	inx
+	jmp again
+
+onNull:	_AL
+	inx	; Skip NUL byte.
+	txa
+	sta 6,s	; Skip past embedded string data on RTS.
+
+	plp
+	ply
+	plx
+	rts
+.)
