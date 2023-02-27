@@ -55,16 +55,14 @@ NXTLIN:	.word $0000	; No more BASIC lines.
 	lda #NSTK
 	tas
 
-	; The nucleus is broken into two or three fragments, depending
-	; on how big it becomes.  The first fragment is 4KB and resides
-	; in RAM at $C000-$CFFF.  This fragment is always in memory,
-	; regardless of which memory configuration is active.
+	; The nucleus is broken into two fragments, depending on how
+	; big it becomes.  The first fragment is 4KB and resides in RAM
+	; at $C000-$CFFF.  This fragment is always in memory,
+	; regardless of which memory configuration is active.  This
+	; makes it ideal for hardware-related interfaces.
 
 	jsr LoadHAL
 	jsr ConfigNucleus
-
-	; If the nucleus ever begins to exceed 12KB in size, we have an
-	; additional 4KB under $D000-$DFFF that we may use.
 
 	; The second fragment is 8KB and resides in RAM at $E000-$FFFF,
 	; underneath the KERNAL ROM.  This fragment is active only when
@@ -72,6 +70,10 @@ NXTLIN:	.word $0000	; No more BASIC lines.
 	; contains all the code which is I/O device independent.
 	; However, this fragment is important because it provides the
 	; native-mode trap vectors.
+	;
+	; If the nucleus ever begins to exceed 12KB in size, we have an
+	; additional 4KB under $D000-$DFFF that we may use to grow to
+	; 16KB.
 
 	jsr LoadNucleus
 	jmp $E000
