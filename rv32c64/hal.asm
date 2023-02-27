@@ -185,3 +185,97 @@ onNull:	_AL
 	plx
 	rts
 .)
+
+;=======================================================================
+;	JSR myCHRIN
+;
+; Reads a character from the current input device and returns it in the
+; low byte of A.  See the C64 PRG for more details on CHRIN/BASIN.
+; CHROUT/BSOUT procedure.
+;
+; Preparation:
+;   Registers:	none.
+;   Memory:	Nucleus configuration.
+;   Calls:	Same as CHRIN.
+;
+; Results:
+;   Registers:	A = character or error code.
+;   Flags:	C set if error.
+;   Memory:	STATUS, RSSTAT updated
+;
+;=======================================================================
+
++myCHRIN:	phx
+	phy
+	php
+	_AXL
+	sta tmpA
+
+	jsr ConfigKERNAL
+	tsa
+	sta progSP
+	lda kernSP
+	tas
+	lda #$0000
+	tad
+	sec
+	xce
+	cli
+	.as
+	.xs
+
+	lda tmpA
+	jsr CHRIN
+	sta tmpA
+
+	sei
+	clc
+	xce
+	_AXL
+	tsa
+	sta kernSP
+	lda progSP
+	tas
+	lda #NDP
+	tad
+	jsr ConfigNucleus
+	_AS
+	lda tmpA
+	plp
+	ply
+	plx
+	rts
+
+;=======================================================================
+;	JSR OutputBuffer
+;
+; Preparation:
+;   Registers:	X/Y in 16-bit mode.
+;	X = address of buffer (bank 0) to read bytes from.
+;	Y = number of bytes to output.
+;   Memory:	none.
+;   Flags:	none.
+;   Calls:	CKOUT (to set current device to write to)
+;
+; Results:
+;   Registers:	A, X, Y used.
+;   Memory:	device dependent.
+;   Flags:	none.
+;=======================================================================
+
++OutputBuffer:	php
+	_AS
+	.xl
+.(
+	cpy #0
+	beq onDone
+
+again:	lda !0,x
+	jsr myCHROUT
+	inx
+	dey
+	bne again
+onDone:
+.)
+	plp
+	rts

@@ -12,9 +12,17 @@ NSTK	= $0AFF	; Native Stack Bottom
 tmpA	= $0B00	; Native/Emulation register linkage
 kernSP	= $0B02	; Last known SP in KERNAL context
 progSP	= $0B04	; Last known SP in nucleus context
+CmdLineLength	= $0B06	; Length of command in buffer
+CmdLineBuf	= $0B80	; 128-byte buffer for holding command line input
 ORIGIN	= $1000	; Start of Nucleus text
 
-; KERNAL routines.  These must be called in emulation mode only.
+; Handy Constants
+
+CR	= $0D	; Carriage return
+
+CmdLineCapacity	= 128	; Maximum length of command line buffer
+
+; KERNAL routines.  These MUST be called in emulation mode only.
 
 CHROUT	= $FFD2
-
+CHRIN	= $FFCF
