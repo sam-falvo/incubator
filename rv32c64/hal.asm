@@ -1,7 +1,8 @@
 ; vim:ts=16:sw=16:noet:ai: 
-; xa -w -M boot.asm -o boot
 ;
-;	Hardware Abstraction Layer - RISC-V RV32I Virtual Machine Monitor
+;	Hardware Abstraction Layer
+;
+;	RISC-V RV32I Virtual Machine Monitor
 ;	Copyright 2023 Samuel A. Falvo II
 ;
 

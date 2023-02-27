@@ -144,7 +144,7 @@ LoadNucleus:	.al
 -ModuleStart	= *
 BeginE000:
 .(
-#include "nucleus.asm"
+#include "cli.asm"
 .)
 LenE000	= *-$E000
 
