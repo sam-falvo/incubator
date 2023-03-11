@@ -15,6 +15,10 @@ mod lexer {
 				next,
 			}
 		}
+
+		fn skip(&mut self) {
+			self.next = self.chars.next();
+		}
 	}
 
 	#[derive(Debug, PartialEq)]
@@ -27,29 +31,40 @@ mod lexer {
 		type Item = Token;
 
 		fn next(&mut self) -> Option<Token> {
-			if let Some(chr) = self.next {
-				if chr.is_ascii_digit() {
-					let mut number: usize = chr.to_digit(10).unwrap() as usize;
+			match self.next {
+				Some(chr) => {
+					if chr.is_ascii_digit() {
+						let mut number: usize = chr.to_digit(10).unwrap() as usize;
 
-					self.next = self.chars.next();
-					loop {
-						if let Some(chr) = self.next {
-							if chr.is_ascii_digit() {
-								number = number * 10 + (chr.to_digit(10).unwrap() as usize);
-								self.next = self.chars.next();
-							}
-							else { break };
-						} else { break };
+						self.skip();
+						loop {
+							if let Some(chr) = self.next {
+								match chr {
+									'_' => {
+										self.skip();
+									},
+
+									_ if chr.is_ascii_digit() => {
+										number = number * 10 + (chr.to_digit(10).unwrap() as usize);
+										self.skip();
+									},
+
+									_ => break,
+								}
+							} else { break };
+						}
+						Some(Token::Number(number))
 					}
-					Some(Token::Number(number))
+					else {
+						let c = Token::Char(chr);
+						self.skip();
+						Some(c)
+					}
+				},
+
+				_ => {
+					None
 				}
-				else {
-					let c = Token::Char(chr);
-					self.next = self.chars.next();
-					Some(c)
-				}
-			} else {
-				None
 			}
 		}
 	}
@@ -92,6 +107,12 @@ mod compile {
 		let result = compile_from_str("420");
 		assert_eq!(result, vec![
 			Ins::LoadAImm16(420),
+			Ins::Return,
+		]);
+
+		let result = compile_from_str("49_152");
+		assert_eq!(result, vec![
+			Ins::LoadAImm16(49152),
 			Ins::Return,
 		]);
 
