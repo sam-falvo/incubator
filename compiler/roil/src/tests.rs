@@ -16,6 +16,98 @@ mod lexer {
         fn skip(&mut self) {
             self.next = self.chars.next();
         }
+
+        fn lex_number(&mut self, chr: char) -> Option<Token> {
+            let mut number: usize = chr.to_digit(10).unwrap() as usize;
+
+            self.skip();
+            loop {
+                if let Some(chr) = self.next {
+                    match chr {
+                        '_' => {
+                            self.skip();
+                        }
+
+                        _ if chr.is_ascii_digit() => {
+                            number = number * 10 + (chr.to_digit(10).unwrap() as usize);
+                            self.skip();
+                        }
+
+                        _ => break,
+                    }
+                } else {
+                    break;
+                };
+            }
+            Some(Token::Number(number))
+        }
+
+        fn lex_octal_number(&mut self, chr: char) -> Option<Token> {
+            let mut number: usize = chr.to_digit(8).unwrap() as usize;
+
+            self.skip();
+            loop {
+                if let Some(chr) = self.next {
+                    match chr {
+                        '_' => {
+                            self.skip();
+                        }
+
+                        _ if chr.is_ascii_digit() => {
+                            number = (number << 3) + (chr.to_digit(8).unwrap() as usize);
+                            self.skip();
+                        }
+
+                        _ => break,
+                    }
+                } else {
+                    break;
+                };
+            }
+            Some(Token::Number(number))
+        }
+
+        fn lex_hex_number(&mut self) -> Option<Token> {
+            self.skip();    // skip the x|X in the 0x prefix.
+            let mut number: usize = 0;
+
+            loop {
+                if let Some(chr) = self.next {
+                    match chr {
+                        '_' => {
+                            self.skip();
+                        }
+
+                        _ if chr.is_ascii_hexdigit() => {
+                            number = (number << 4) + (chr.to_digit(16).unwrap() as usize);
+                            self.skip();
+                        }
+
+                        _ => break,
+                    }
+                } else {
+                    break;
+                };
+            }
+            Some(Token::Number(number))
+        }
+
+        fn lex_based_number(&mut self) -> Option<Token> {
+            // we already know the current character is '0'.
+            self.skip();
+
+            if let Some(chr) = self.next {
+                match chr {
+                    'd' | 'D' => self.lex_number('0'),
+                    'x' | 'X' => self.lex_hex_number(),
+                    'q' | 'Q' | 'o' | 'O' => self.lex_octal_number('0'),
+                    _ if (chr >= '0') && (chr <= '7') => self.lex_octal_number(chr),
+                    _ => self.lex_number(chr),
+                }
+            } else {
+                None
+            }
+        }
     }
 
     #[derive(Debug, PartialEq)]
@@ -30,29 +122,10 @@ mod lexer {
         fn next(&mut self) -> Option<Token> {
             match self.next {
                 Some(chr) => {
-                    if chr.is_ascii_digit() {
-                        let mut number: usize = chr.to_digit(10).unwrap() as usize;
-
-                        self.skip();
-                        loop {
-                            if let Some(chr) = self.next {
-                                match chr {
-                                    '_' => {
-                                        self.skip();
-                                    }
-
-                                    _ if chr.is_ascii_digit() => {
-                                        number = number * 10 + (chr.to_digit(10).unwrap() as usize);
-                                        self.skip();
-                                    }
-
-                                    _ => break,
-                                }
-                            } else {
-                                break;
-                            };
-                        }
-                        Some(Token::Number(number))
+                    if chr == '0' {
+                        self.lex_based_number()
+                    } else if chr.is_ascii_digit() {
+                        self.lex_number(chr)
                     } else {
                         let c = Token::Char(chr);
                         self.skip();
@@ -99,6 +172,20 @@ mod compile {
 
         let result = compile_from_str("49_152");
         assert_eq!(result, vec![Ins::LoadAImm16(49152), Ins::Return,]);
+
+        let result = compile_from_str("0xC000");
+        assert_eq!(result, vec![Ins::LoadAImm16(49152), Ins::Return,]);
+
+        let result = compile_from_str("0q10");
+        assert_eq!(result, vec![Ins::LoadAImm16(8), Ins::Return,]);
+
+        // I really hate C-style octal syntax.  AT&T should be ashamed of
+        // themselves and should feel bad.
+        let result = compile_from_str("010");
+        assert_eq!(result, vec![Ins::LoadAImm16(8), Ins::Return,]);
+
+        let result = compile_from_str("080");
+        assert_eq!(result, vec![Ins::LoadAImm16(80), Ins::Return,]);
 
         let result = compile_from_str("-42");
         assert_eq!(result, vec![]);
