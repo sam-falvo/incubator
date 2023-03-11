@@ -1,0 +1,74 @@
+vdcBase:
+    DEFW   0
+vdcReg:
+    DEFW   0
+vdcData:
+    DEFW   0
+_vdcDataH:
+    DEFW   0
+_vdcDataL:
+    DEFW   0
+nBits:
+    DEFW   0
+vdcWaitReady:
+    LD     BC,(vdcBase)
+    IN     A,(C)
+    LD     E,A
+    LD     D,0
+    LD     HL,128
+    LD     A,L
+    AND    A,E
+    LD     L,A
+    LD     A,H
+    AND    A,D
+    LD     H,A
+    LD     A,L
+    OR     A,H
+    RET    Z
+    JP     vdcWaitReady
+vdcWriteByte:
+    CALL   vdcWaitReady
+    LD     BC,(vdcBase)
+    LD     A,(vdcReg)
+    OUT    (C),A
+    LD     DE,(vdcBase)
+    LD     HL,1
+    LD     A,L
+    ADD    A,E
+    LD     C,A
+    LD     A,H
+    ADC    A,D
+    LD     B,A
+    LD     A,(vdcData)
+    OUT    (C),A
+    RET    
+vdcWriteAddress:
+    LD     HL,(vdcData)
+    LD     A,(nBits)
+    LD     B,A
+    LD     A,B
+    OR     A,A
+    JZ     L103
+L102:
+    SRL    H
+    RL     L
+    DJNZ   L102
+L103:
+    LD     (_vdcDataH),HL
+    LD     HL,(vdcData)
+    LD     H,0
+    LD     (_vdcDataL),HL
+    LD     HL,(_vdcDataH)
+    LD     (vdcData),HL
+    LD     DE,1
+    LD     HL,(vdcReg)
+    ADD    HL,DE
+    LD     (vdcReg),HL
+    CALL   vdcWriteByte
+    LD     HL,(_vdcDataL)
+    LD     (vdcData),HL
+    LD     DE,-1
+    LD     HL,(vdcReg)
+    ADD    HL,DE
+    LD     (vdcReg),HL
+    JP     vdcWriteByte

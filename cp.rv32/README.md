@@ -1,4 +1,4 @@
-# RV32C64
+# CP/RV32
 
 This is an experimental program intended to execute code written in (no-std)
 Rust on a Commodore 64 equipped with a 16MB SuperCPU accelerator, or its
@@ -68,4 +68,100 @@ includes VIC-II frame buffer or color maps, CIA registers, SID settings, etc.
 Gaining access to these resources will require invoking higher-level services
 of the emulator.  **How this is done remains to be determined.**
 
+## Specifying a Program to Run
+
+When running, CP/RV32 will present a READY prompt, similar to but not the same
+as, BASIC.  It is asking for something to do.
+
+    **** CP/RV32 V1 ****
+
+    READY; U8
+    _
+
+To run a program, simply type its name as it appears in the disk directory.
+For example, to run the HELLO application, which does little more than print
+out HELLO WORLD to the screen, type in HELLO and press enter.
+
+    **** CP/RV32 V1 ****
+
+    READY; U8
+    HELLO
+    HELLO WORLD!
+
+    READY; U8
+    _
+
+For this to work, HELLO must reside on the disk mounted in device 8.  The U8
+after the READY prompt is a reminder to the user that disk device 8 is what
+will be searched when looking for commands to run.
+
+If you want to run a program which is located on another disk device, you'll
+need tell CP/RV32 on what device to look for the command.  To do this, you'll
+want to use the UNIT built-in command.
+
+    READY; U8
+    UNIT 12
+
+    READY; U12
+    _
+
+Those with CMD hard drives will be pleased to know that you can also specify a
+partition number in the filename as well.  Note that this also works as
+expected for those using Commodore dual-drive floppy devices (e.g., the CBM
+8050) as well.
+
+    READY; U12
+    4:HELLO
+    HELLO WORLD!
+
+    READY; U12
+    _
+
+Similarly, a pathname through several subdirectories can also be specified by
+placing it after the partition number.  Note that CMD's HD DOS uses slashes to
+separate path name components, not colons; this is to retain compatibility with
+the older CBM DOS filename syntax rules.
+
+    READY; U12
+    2//some/subdirectory/names/here/:HELLO
+    HELLO WORLD!
+
+    READY; U12
+    _
+
+My understanding of SD2IEC-based storage devices suggests that it is compatible
+with the above path naming notations.
+
+NOTE: If, for some reason, you desire to run a command literally named UNIT,
+you can only do so by prefixing it with the partition number, like so:
+
+    READY; U12
+    UNIT 8
+
+    READY; U8
+    0:UNIT
+    ...
+
+If there is a space anywhere in the path name or file name, you must wrap the
+whole command name in quotation marks, like so:
+
+    READY; U12
+    "//ROOTED/PATH/TO/SOME DIR W SPACE/:A FILE NAME HERE"
+    ...
+
+## Specifying Program Parameters
+
+The entire command input buffer will be passed as-is to the program you invoke.
+In this way, you can specify parameters to the program, including the name used
+to invoke the command itself.
+
+    READY; U12
+    ECHO HELLO WORLD!
+    HELLO WORLD!
+
+    READY; U12
+    _
+
+It is entirely up to the invoked program to interpret any command line options
+provided.  General command syntax is not specified here.
 

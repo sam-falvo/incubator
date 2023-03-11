@@ -1,0 +1,68 @@
+vdcBase:
+    .WORD  0
+vdcReg:
+    .WORD  0
+vdcData:
+    .WORD  0
+_vdcDataH:
+    .WORD  0
+_vdcDataL:
+    .WORD  0
+nBits:
+    .WORD  0
+vdcWaitReady:
+    LDA    vdcBase
+    TAX    
+    LDA    0,X
+    AND    #$00FF
+    STA    $00
+    LDA    #128
+    AND    $00
+    BNE    *+3
+    RTS    
+    JMP    vdcWaitReady
+vdcWriteByte:
+    JSR    vdcWaitReady
+    LDA    vdcBase
+    TAX    
+    LDA    vdcReg
+    SEP    #$20
+    STA    0,X
+    REP    #$20
+    LDA    vdcBase
+    STA    $00
+    LDA    #1
+    CLC    
+    ADC    $00
+    TAX    
+    LDA    vdcData
+    SEP    #$20
+    STA    0,X
+    REP    #$20
+    RET    
+vdcWriteAddress:
+    LDA    vdcData
+    XBA    
+    AND    #$00FF
+    STA    _vdcDataH
+    LDA    vdcData
+    AND    #$00FF
+    STA    _vdcDataL
+    LDA    _vdcDataH
+    STA    vdcData
+    LDA    #1
+    STA    $00
+    LDA    vdcReg
+    CLC    
+    ADC    $00
+    STA    vdcReg
+    JSR    vdcWriteByte
+    LDA    _vdcDataL
+    STA    vdcData
+    LDA    #-1
+    STA    $00
+    LDA    vdcReg
+    CLC    
+    ADC    $00
+    STA    vdcReg
+    JMP    vdcWriteByte
