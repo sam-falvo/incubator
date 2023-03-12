@@ -17,8 +17,8 @@ mod lexer {
             self.next = self.chars.next();
         }
 
-        fn lex_number(&mut self, chr: char) -> Option<Token> {
-            let mut number: usize = chr.to_digit(10).unwrap() as usize;
+        fn lex_octdec_number(&mut self, chr: char, base: u32) -> Option<Token> {
+            let mut number: u32 = chr.to_digit(base).unwrap();
             self.skip();
             loop {
                 match self.next {
@@ -27,32 +27,22 @@ mod lexer {
                     },
 
                     Some(chr) if chr.is_ascii_digit() => {
-                        number = number * 10 + (chr.to_digit(10).unwrap() as usize);
+                        number = number * base + chr.to_digit(base).unwrap();
                         self.skip();
                     },
 
                     _ => break,
                 }
             }
-            Some(Token::Number(number))
+            Some(Token::Number(number as usize))
+        }
+
+        fn lex_number(&mut self, chr: char) -> Option<Token> {
+            self.lex_octdec_number(chr, 10)
         }
 
         fn lex_octal_number(&mut self, chr: char) -> Option<Token> {
-            let mut number: usize = chr.to_digit(8).unwrap() as usize;
-            self.skip();
-            loop {
-                match self.next {
-                    Some(chr) if chr == '_' => self.skip(),
-
-                    Some(chr) if chr.is_ascii_digit() => {
-                        number = number * 8 + (chr.to_digit(8).unwrap() as usize);
-                        self.skip();
-                    },
-
-                    _ => break,
-                }
-            }
-            Some(Token::Number(number))
+            self.lex_octdec_number(chr, 8)
         }
 
         fn lex_hex_number(&mut self) -> Option<Token> {
