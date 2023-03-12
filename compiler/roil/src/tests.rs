@@ -151,15 +151,31 @@ mod compile {
     pub fn compile_from_str(input: &str) -> Vec<Ins> {
         let mut l = Lexer::new_from_str(input);
 
-        let token = l.next();
-        if let Some(maybe_number) = token {
-            if let Token::Number(n) = maybe_number {
-                return vec![Ins::LoadAImm16(n as u16), Ins::Return];
-            }
-        }
+        let next = l.next();
+        if let Some(tok) = next {
+            match tok {
+                Token::Char(ch) if ch == '-' => {
+                    let next = l.next();
+                    if let Some(maybe_number) = next {
+                        if let Token::Number(n) = maybe_number {
+                            vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return]
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                },
 
-        // otherwise, syntax error, but we're not there yet.
-        vec![]
+                Token::Number(n) => {
+                    vec![Ins::LoadAImm16(n as u16), Ins::Return]
+                },
+
+                _ => vec![],
+            }
+        } else {
+            vec![]
+        }
     }
 
     #[test]
@@ -188,6 +204,6 @@ mod compile {
         assert_eq!(result, vec![Ins::LoadAImm16(80), Ins::Return,]);
 
         let result = compile_from_str("-42");
-        assert_eq!(result, vec![]);
+        assert_eq!(result, vec![Ins::LoadAImm16(0xFFD6), Ins::Return,]);
     }
 }
