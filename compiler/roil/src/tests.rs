@@ -47,19 +47,19 @@ mod lexer {
 
         fn lex_hex_number(&mut self) -> Option<Token> {
             self.skip();    // skip the x|X in the 0x prefix.
-            let mut number: usize = 0;
+            let mut number: u32 = 0;
 
             loop {
                 match self.next {
                     Some(chr) if chr == '_' => self.skip(),
                     Some(chr) if chr.is_ascii_hexdigit() => {
-                        number = (number << 4) + (chr.to_digit(16).unwrap() as usize);
+                        number = (number << 4) + chr.to_digit(16).unwrap();
                         self.skip();
                     },
                     _ => break,
                 }
             }
-            Some(Token::Number(number))
+            Some(Token::Number(number as usize))
         }
 
         fn lex_based_number(&mut self) -> Option<Token> {
