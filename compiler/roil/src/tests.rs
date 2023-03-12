@@ -19,50 +19,38 @@ mod lexer {
 
         fn lex_number(&mut self, chr: char) -> Option<Token> {
             let mut number: usize = chr.to_digit(10).unwrap() as usize;
-
             self.skip();
             loop {
-                if let Some(chr) = self.next {
-                    match chr {
-                        '_' => {
-                            self.skip();
-                        }
+                match self.next {
+                    Some(chr) if chr == '_' => {
+                        self.skip();
+                    },
 
-                        _ if chr.is_ascii_digit() => {
-                            number = number * 10 + (chr.to_digit(10).unwrap() as usize);
-                            self.skip();
-                        }
+                    Some(chr) if chr.is_ascii_digit() => {
+                        number = number * 10 + (chr.to_digit(10).unwrap() as usize);
+                        self.skip();
+                    },
 
-                        _ => break,
-                    }
-                } else {
-                    break;
-                };
+                    _ => break,
+                }
             }
             Some(Token::Number(number))
         }
 
         fn lex_octal_number(&mut self, chr: char) -> Option<Token> {
             let mut number: usize = chr.to_digit(8).unwrap() as usize;
-
             self.skip();
             loop {
-                if let Some(chr) = self.next {
-                    match chr {
-                        '_' => {
-                            self.skip();
-                        }
+                match self.next {
+                    Some(chr) if chr == '_' => self.skip(),
 
-                        _ if chr.is_ascii_digit() => {
-                            number = (number << 3) + (chr.to_digit(8).unwrap() as usize);
-                            self.skip();
-                        }
+                    Some(chr) if chr.is_ascii_digit() => {
+                        number = number * 8 + (chr.to_digit(8).unwrap() as usize);
+                        self.skip();
+                    },
 
-                        _ => break,
-                    }
-                } else {
-                    break;
-                };
+                    _ => break,
+                }
             }
             Some(Token::Number(number))
         }
@@ -72,22 +60,14 @@ mod lexer {
             let mut number: usize = 0;
 
             loop {
-                if let Some(chr) = self.next {
-                    match chr {
-                        '_' => {
-                            self.skip();
-                        }
-
-                        _ if chr.is_ascii_hexdigit() => {
-                            number = (number << 4) + (chr.to_digit(16).unwrap() as usize);
-                            self.skip();
-                        }
-
-                        _ => break,
-                    }
-                } else {
-                    break;
-                };
+                match self.next {
+                    Some(chr) if chr == '_' => self.skip(),
+                    Some(chr) if chr.is_ascii_hexdigit() => {
+                        number = (number << 4) + (chr.to_digit(16).unwrap() as usize);
+                        self.skip();
+                    },
+                    _ => break,
+                }
             }
             Some(Token::Number(number))
         }
@@ -96,16 +76,13 @@ mod lexer {
             // we already know the current character is '0'.
             self.skip();
 
-            if let Some(chr) = self.next {
-                match chr {
-                    'd' | 'D' => self.lex_number('0'),
-                    'x' | 'X' => self.lex_hex_number(),
-                    'q' | 'Q' | 'o' | 'O' => self.lex_octal_number('0'),
-                    _ if (chr >= '0') && (chr <= '7') => self.lex_octal_number(chr),
-                    _ => self.lex_number(chr),
-                }
-            } else {
-                None
+            match self.next {
+                Some('d') | Some('D') => self.lex_number('0'),
+                Some('x') | Some('X') => self.lex_hex_number(),
+                Some('q') | Some('Q') | Some('o') | Some('O') => self.lex_octal_number('0'),
+                Some(chr) if (chr >= '0') && (chr <= '7') => self.lex_octal_number(chr),
+                Some(chr) => self.lex_number(chr),
+                None => None,
             }
         }
     }
@@ -121,18 +98,12 @@ mod lexer {
 
         fn next(&mut self) -> Option<Token> {
             match self.next {
+                Some('0') => self.lex_based_number(),
+                Some(chr) if chr.is_ascii_digit() => self.lex_number(chr),
                 Some(chr) => {
-                    if chr == '0' {
-                        self.lex_based_number()
-                    } else if chr.is_ascii_digit() {
-                        self.lex_number(chr)
-                    } else {
-                        let c = Token::Char(chr);
-                        self.skip();
-                        Some(c)
-                    }
-                }
-
+                    self.skip();
+                    Some(Token::Char(chr))
+                },
                 _ => None,
             }
         }
@@ -152,29 +123,16 @@ mod compile {
         let mut l = Lexer::new_from_str(input);
 
         let next = l.next();
-        if let Some(tok) = next {
-            match tok {
-                Token::Char(ch) if ch == '-' => {
-                    let next = l.next();
-                    if let Some(maybe_number) = next {
-                        if let Token::Number(n) = maybe_number {
-                            vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return]
-                        } else {
-                            vec![]
-                        }
-                    } else {
-                        vec![]
-                    }
-                },
-
-                Token::Number(n) => {
-                    vec![Ins::LoadAImm16(n as u16), Ins::Return]
-                },
-
-                _ => vec![],
-            }
-        } else {
-            vec![]
+        match next {
+            Some(Token::Char(ch)) if ch == '-' => {
+                let next = l.next();
+                match next {
+                    Some(Token::Number(n)) => vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return],
+                    _ => vec![],
+                }
+            },
+            Some(Token::Number(n)) => vec![Ins::LoadAImm16(n as u16), Ins::Return],
+            _ => vec![],
         }
     }
 
