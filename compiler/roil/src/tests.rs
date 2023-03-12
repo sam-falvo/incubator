@@ -16,10 +16,12 @@ pub fn compile_from_str(input: &str) -> Vec<Ins> {
         Some(Token::Char(ch)) if ch == '-' => {
             let next = l.next();
             match next {
-                Some(Token::Number(n)) => vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return],
+                Some(Token::Number(n)) => {
+                    vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return]
+                }
                 _ => vec![],
             }
-        },
+        }
         Some(Token::Number(n)) => vec![Ins::LoadAImm16(n as u16), Ins::Return],
         _ => vec![],
     }
