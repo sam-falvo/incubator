@@ -2,9 +2,12 @@
 
 use crate::lexer::{Lexer, Token};
 
+type TargetSInt = i16;
+type TargetUInt = u16;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
-    LoadAImm16(u16),
+    LoadAImm16(TargetUInt),
     Return,
 }
 
@@ -27,7 +30,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
 
     fn negate(&self, i: Item) -> Item { 
         match i {
-            Item::ConstInteger(n) => Item::ConstInteger((!n).wrapping_add(1)),
+            Item::ConstInteger(n) => Item::ConstInteger(-(n as TargetSInt) as TargetUInt),
             _ => i,
         }
     }
@@ -53,7 +56,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
     pub fn g_primary(&mut self) -> Item {
         match self.next {
             Some(Token::Number(n)) => {
-                let i = Item::ConstInteger(n as u16);
+                let i = Item::ConstInteger(n as TargetUInt);
                 self.skip();
                 i
             },
@@ -65,7 +68,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Item {
     Error,
-    ConstInteger(u16),
+    ConstInteger(TargetUInt),
 }
 
 pub fn compile_from_str(input: &str) -> Vec<Ins> {
