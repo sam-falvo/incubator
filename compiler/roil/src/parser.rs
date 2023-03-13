@@ -10,7 +10,10 @@ pub struct Parser<'input_lifetime> {
 
 impl<'input_lifetime> Parser<'input_lifetime> {
     pub fn new(input: &'input_lifetime str) -> Self {
-        let mut p = Self { lexer: Lexer::new_from_str(input), next: None };
+        let mut p = Self {
+            lexer: Lexer::new_from_str(input),
+            next: None,
+        };
         p.skip(); // prime the token stream
 
         p
@@ -20,7 +23,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
         self.next = self.lexer.next();
     }
 
-    fn negate(&self, i: Item) -> Item { 
+    fn negate(&self, i: Item) -> Item {
         match i {
             Item::ConstInteger(n) => Item::ConstInteger(-(n as TargetSInt) as TargetUInt),
             _ => i,
@@ -37,11 +40,9 @@ impl<'input_lifetime> Parser<'input_lifetime> {
                 self.skip();
                 let e = self.g_primary();
                 self.negate(e)
-            },
+            }
 
-            _ => {
-                self.g_primary()
-            },
+            _ => self.g_primary(),
         }
     }
 
@@ -51,7 +52,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
                 let i = Item::ConstInteger(n as TargetUInt);
                 self.skip();
                 i
-            },
+            }
             _ => Item::Error,
         }
     }

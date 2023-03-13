@@ -1,6 +1,6 @@
 // vim:ts=4:sw=4:et:ai
 
-use crate::parser::{Parser, Item, TargetUInt};
+use crate::parser::{Item, Parser, TargetUInt};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
