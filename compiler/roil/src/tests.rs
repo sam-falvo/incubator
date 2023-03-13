@@ -42,6 +42,9 @@ fn unsigned_integer() {
     let result = compile_from_str("080");
     assert_eq!(result, vec![Ins::LoadAImm16(80), Ins::Return,]);
 
+    // Numbers formatted like 0018 or 018 will not (currently) parse correctly.
+    // This is a known issue; but, fixing this is low priority as I write this.
+
     let result = compile_from_str("-42");
     assert_eq!(result, vec![Ins::LoadAImm16(0xFFD6), Ins::Return,]);
 }
