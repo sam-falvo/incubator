@@ -1,12 +1,12 @@
 // vim:ts=4:sw=4:et:ai
 
-pub struct Lexer<'lexer_life> {
-    pub chars: core::str::Chars<'lexer_life>,
+pub struct Lexer<'input_str_lifetime> {
+    pub chars: core::str::Chars<'input_str_lifetime>,
     pub next: Option<char>,
 }
 
-impl<'lexer_lifetime> Lexer<'lexer_lifetime> {
-    pub fn new_from_str(input: &'lexer_lifetime str) -> Self {
+impl<'input_lifetime> Lexer<'input_lifetime> {
+    pub fn new_from_str(input: &'input_lifetime str) -> Self {
         let mut chars = input.chars();
         let next = chars.next();
         Self { chars, next }
@@ -76,13 +76,13 @@ impl<'lexer_lifetime> Lexer<'lexer_lifetime> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Token {
     Char(char),
     Number(usize),
 }
 
-impl<'lexer_lifetime> Iterator for Lexer<'lexer_lifetime> {
+impl<'input_lifetime> Iterator for Lexer<'input_lifetime> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
