@@ -2,27 +2,77 @@
 
 use crate::lexer::{Lexer, Token};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
     LoadAImm16(u16),
     Return,
 }
 
-pub fn compile_from_str(input: &str) -> Vec<Ins> {
-    let mut l = Lexer::new_from_str(input);
+pub struct Parser<'input_lifetime> {
+    lexer: Lexer<'input_lifetime>,
+    pub next: Option<Token>,
+}
 
-    let next = l.next();
-    match next {
-        Some(Token::Char(ch)) if ch == '-' => {
-            let next = l.next();
-            match next {
-                Some(Token::Number(n)) => {
-                    vec![Ins::LoadAImm16((!n).wrapping_add(1) as u16), Ins::Return]
-                }
-                _ => vec![],
-            }
+impl<'input_lifetime> Parser<'input_lifetime> {
+    pub fn new(input: &'input_lifetime str) -> Self {
+        let mut p = Self { lexer: Lexer::new_from_str(input), next: None };
+        p.skip(); // prime the token stream
+
+        p
+    }
+
+    pub fn skip(&mut self) {
+        self.next = self.lexer.next();
+    }
+
+    fn negate(&self, i: Item) -> Item { 
+        match i {
+            Item::ConstInteger(n) => Item::ConstInteger((!n).wrapping_add(1)),
+            _ => i,
         }
-        Some(Token::Number(n)) => vec![Ins::LoadAImm16(n as u16), Ins::Return],
+    }
+
+    pub fn g_expr(&mut self) -> Item {
+        self.g_unary()
+    }
+
+    pub fn g_unary(&mut self) -> Item {
+        match self.next {
+            Some(Token::Char('-')) => {
+                self.skip();
+                let e = self.g_primary();
+                self.negate(e)
+            },
+
+            _ => {
+                self.g_primary()
+            },
+        }
+    }
+
+    pub fn g_primary(&mut self) -> Item {
+        match self.next {
+            Some(Token::Number(n)) => {
+                let i = Item::ConstInteger(n as u16);
+                self.skip();
+                i
+            },
+            _ => Item::Error,
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Item {
+    Error,
+    ConstInteger(u16),
+}
+
+pub fn compile_from_str(input: &str) -> Vec<Ins> {
+    let mut p = Parser::new(input);
+    let i = p.g_expr();
+    match i {
+        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
         _ => vec![],
     }
 }
