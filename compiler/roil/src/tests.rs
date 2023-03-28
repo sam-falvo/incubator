@@ -1,19 +1,78 @@
 // vim:ts=4:sw=4:et:ai
 
-use crate::parser::{Item, Parser, TargetUInt};
+use crate::parser::{Item, Parser, TargetUInt, TargetByte};
+use crate::lexer::Token;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
     LoadAImm16(TargetUInt),
+    StoreADP(TargetByte),
     Return,
 }
 
 pub fn compile_from_str(input: &str) -> Vec<Ins> {
     let mut p = Parser::new(input);
-    let i = p.g_expr();
-    match i {
-        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
-        _ => vec![],
+
+    match p.next {
+        Some(Token::Let) => {
+            p.skip();
+
+            eprintln!("GOT LET");
+            let id: String;
+            eprintln!("  {:?}", p.next);
+            if let Some(Token::Id(s1)) = p.next.clone() {
+                id = s1;
+                p.skip();
+                eprintln!("GOT ID: {:?}", id);
+            } else {
+                return vec![];
+            }
+
+            if let Some(Token::Char(':')) = p.next {
+                p.skip();
+                eprintln!("GOT :");
+            } else {
+                return vec![];
+            }
+
+            let type_: String;
+            if let Some(Token::Id(s2)) = p.next.clone() {
+                type_ = s2;
+                p.skip();
+                eprintln!("GOT TYPE: {:?}", type_);
+            } else {
+                return vec![];
+            }
+
+            let rval;
+            if let Some(Token::Char('=')) = p.next {
+                p.skip();
+                eprintln!("GOT =");
+
+                rval = p.g_expr();
+            } else {
+                return vec![];
+            }
+
+            if let Some(Token::Char(';')) = p.next {
+                p.skip();
+                eprintln!("GOT ;");
+            } else {
+                return vec![];
+            }
+
+            eprintln!("  LET {:?} : {:?} = {:?}", id, type_, rval);
+            eprintln!("Let Not implemented");
+            vec![]
+        }
+
+        _ => {
+            let i = p.g_expr();
+            match i {
+                Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
+                _ => vec![],
+            }
+        }
     }
 }
 
@@ -47,4 +106,19 @@ fn unsigned_integer() {
 
     let result = compile_from_str("-42");
     assert_eq!(result, vec![Ins::LoadAImm16(0xFFD6), Ins::Return,]);
+}
+
+#[test]
+fn let_binding() {
+    let dp_base = 2;
+
+    let result = compile_from_str("let x: u16 = 0;");
+    assert_eq!(result, vec![Ins::LoadAImm16(0), Ins::StoreADP(dp_base), Ins::Return,]);
+
+    let result = compile_from_str("let x: u16 = 1; let y: u16 = 2;");
+    assert_eq!(result, vec![
+        Ins::LoadAImm16(1), Ins::StoreADP(dp_base),
+        Ins::LoadAImm16(2), Ins::StoreADP(dp_base+2),
+        Ins::Return,
+    ]);
 }

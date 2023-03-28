@@ -2,6 +2,7 @@ use crate::lexer::{Lexer, Token};
 
 pub type TargetSInt = i16;
 pub type TargetUInt = u16;
+pub type TargetByte = u8;
 
 pub struct Parser<'input_lifetime> {
     lexer: Lexer<'input_lifetime>,
