@@ -1,8 +1,6 @@
 // vim:ts=4:sw=4:et:ai
 
 use crate::parser::{Item, Parser, TargetUInt, TargetByte};
-use crate::lexer::Token;
-
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
     LoadAImm16(TargetUInt),
@@ -14,67 +12,25 @@ pub fn compile_from_str(input: &str) -> Vec<Ins> {
     let mut p = Parser::new(input);
     let mut st = SymTab::new();
 
-    match p.next {
-        Some(Token::Let) => {
-            p.skip();
-
-            let id: String;
-            if let Some(Token::Id(s1)) = p.next.clone() {
-                id = s1;
-                p.skip();
-            } else {
-                return vec![];
-            }
-
-            if let Some(Token::Char(':')) = p.next {
-                p.skip();
-            } else {
-                return vec![];
-            }
-
-            let type_: String;
-            if let Some(Token::Id(s2)) = p.next.clone() {
-                type_ = s2;
-                p.skip();
-            } else {
-                return vec![];
-            }
-
-            let rval;
-            if let Some(Token::Char('=')) = p.next {
-                p.skip();
-                rval = p.g_expr();
-            } else {
-                return vec![];
-            }
-
-            if let Some(Token::Char(';')) = p.next {
-                p.skip();
-            } else {
-                return vec![];
-            }
-
-            eprintln!("  LET {:?} : {:?} = {:?}", id, type_, rval);
-
+    match p.g_statement() {
+        Item::DeclareLocal(ref id, rval) => {
             st.create_local(&id);
             match st.find_by_name(&id) {
                 Ok(sym) => {
-                    match rval {
+                    match *rval {
                         Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::StoreADP(sym.offset as u8), Ins::Return,],
                         _ => vec![],
                     }
                 }
+
                 Err(_) => vec![],
             }
         }
 
-        _ => {
-            let i = p.g_expr();
-            match i {
-                Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
-                _ => vec![],
-            }
-        }
+        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
+
+        // Syntax error; I'll implement errors later
+        _ => vec![],
     }
 }
 
