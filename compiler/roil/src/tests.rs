@@ -12,6 +12,7 @@ pub enum Ins {
 
 pub fn compile_from_str(input: &str) -> Vec<Ins> {
     let mut p = Parser::new(input);
+    let mut st = SymTab::new();
 
     match p.next {
         Some(Token::Let) => {
@@ -54,8 +55,17 @@ pub fn compile_from_str(input: &str) -> Vec<Ins> {
             }
 
             eprintln!("  LET {:?} : {:?} = {:?}", id, type_, rval);
-            eprintln!("Let Not implemented");
-            vec![]
+
+            st.create_local(&id);
+            match st.find_by_name(&id) {
+                Ok(sym) => {
+                    match rval {
+                        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::StoreADP(sym.offset as u8), Ins::Return,],
+                        _ => vec![],
+                    }
+                }
+                Err(_) => vec![],
+            }
         }
 
         _ => {
