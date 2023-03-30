@@ -1,6 +1,8 @@
 // vim:ts=4:sw=4:et:ai
 
+use crate::lexer::Token;
 use crate::parser::{Item, Parser, TargetUInt, TargetByte};
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Ins {
     LoadAImm16(TargetUInt),
@@ -8,29 +10,58 @@ pub enum Ins {
     Return,
 }
 
-pub fn compile_from_str(input: &str) -> Vec<Ins> {
-    let mut p = Parser::new(input);
-    let mut st = SymTab::new();
+// convenience, less to type all the time.
+fn append(this: Vec<Ins>, onto_that: &mut Vec<Ins>) {
+    onto_that.extend_from_slice(&this)
+}
 
-    match p.g_statement() {
+pub fn cg_item(item: Item, st: &mut SymTab) -> Vec<Ins> {
+    match item {
         Item::DeclareLocal(ref id, rval) => {
             st.create_local(&id);
             match st.find_by_name(&id) {
                 Ok(sym) => {
-                    match *rval {
-                        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::StoreADP(sym.offset as u8), Ins::Return,],
-                        _ => vec![],
-                    }
-                }
+                    let offset = sym.offset as u8;
+                    let mut sublisting = cg_item(*rval, st);
+                    append(vec![Ins::StoreADP(offset)], &mut sublisting);
+                    return sublisting;
+                },
 
-                Err(_) => vec![],
+                _ => return vec![],
             }
         }
 
-        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n), Ins::Return],
+        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n)],
 
-        // Syntax error; I'll implement errors later
-        _ => vec![],
+        // If we're here, we hit a syntax error that wasn't caught by the parser.
+        // Return something sensible in this case.  TODO.
+        _ => return vec![],
+    }
+}
+
+pub fn compile_from_str(input: &str) -> Vec<Ins> {
+    let mut p = Parser::new(input);
+    let mut st = SymTab::new();
+    let mut listing: Vec<Ins> = Vec::new();
+
+    loop {
+        if let None = p.next {
+            append(vec![Ins::Return], &mut listing);
+            return listing;
+        }
+
+        let item = p.g_statement();
+        append(cg_item(item, &mut st), &mut listing);
+
+        if let Some(Token::Char(';')) = p.next {
+            p.skip();
+        } else {
+            // Statements are to be separated by semicolons.
+            // Syntax error if not.
+            if p.next != None {
+                return vec![]
+            }
+        }
     }
 }
 
@@ -119,7 +150,7 @@ impl SymTab {
         self.next_local += 2;
     }
 
-    pub fn find_by_name<'n>(&'n self, name: &'n str) -> Result<Symbol, Errors> {
+    pub fn find_by_name<'n>(&'n self, name: &'n str) -> Result<Box<Symbol>, Errors> {
         // If the symbol table is empty, then, by definition,
         // the symbol cannot be found.
         if self.length == 0 {
@@ -152,10 +183,10 @@ impl SymTab {
         }
 
         // If we're here, then we must have found a viable candidate.
-        return Ok(Symbol{
+        return Ok(Box::new(Symbol{
             name: name,
             offset: *self.offsets.get(i).ok_or(Errors::BadSymbolTableIndex)?,
-        });
+        }));
     }
 }
 

@@ -81,34 +81,7 @@ impl<'input_lifetime> Parser<'input_lifetime> {
             return Item::Error;
         }
 
-        // Why am I getting a E0503 error on the following line,
-        // when this sequence of code is repeated so many times before
-        // without error?
-        //
-        // According to E0503's diagnostic, the line above, rval =
-        // self.g_expr();, is what performs the mutable borrow.  OK, I get
-        // that; however, so does self.skip().  The only difference I can see
-        // is that the former line returns a value of type Item, which has
-        // its own lifetime associated with it, 'item.  Moreover, Items never
-        // refer back to the parser; they can only refer to other Items,
-        // forming a simple tree of Items as required.
-        //
-        // According to the rustc explanation, the only reasonable
-        // work-around is to clone() the parser.  This is, for what I hope
-        // are obvious reasons, impractical.
-        //
-        //     .--------------------.
-        if let Some(Token::Char(';')) = self.next {
-            self.skip();
-        } else {
-            return Item::Error;
-        }
-
-	// I am aware that this line will yield a compile-time error, since I'm
-	// returning a reference to a local.  I'm not sure how to resolve this yet;
-	// however, I believe this is completely irrelevant to the E0503 error
-	// I'm getting above.
-        Item::DeclareLocal(id, &rval)
+        Item::DeclareLocal(id, Box::new(rval))
     }
 
     pub fn g_unary(&mut self) -> Item {
@@ -136,8 +109,8 @@ impl<'input_lifetime> Parser<'input_lifetime> {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Item<'subitem> {
+pub enum Item {
     Error,
     ConstInteger(TargetUInt),
-    DeclareLocal(String, &'subitem Item<'subitem>),
+    DeclareLocal(String, Box<Item>),
 }
