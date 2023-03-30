@@ -1,43 +1,9 @@
 // vim:ts=4:sw=4:et:ai
 
+use crate::codegen::{cg_item, Ins};
 use crate::lexer::Token;
-use crate::parser::{Item, Parser, TargetUInt, TargetByte};
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Ins {
-    LoadAImm16(TargetUInt),
-    StoreADP(TargetByte),
-    Return,
-}
-
-// convenience, less to type all the time.
-fn append(this: Vec<Ins>, onto_that: &mut Vec<Ins>) {
-    onto_that.extend_from_slice(&this)
-}
-
-pub fn cg_item(item: Item, st: &mut SymTab) -> Vec<Ins> {
-    match item {
-        Item::DeclareLocal(ref id, rval) => {
-            st.create_local(&id);
-            match st.find_by_name(&id) {
-                Ok(sym) => {
-                    let offset = sym.offset as u8;
-                    let mut sublisting = cg_item(*rval, st);
-                    append(vec![Ins::StoreADP(offset)], &mut sublisting);
-                    return sublisting;
-                },
-
-                _ => return vec![],
-            }
-        }
-
-        Item::ConstInteger(n) => vec![Ins::LoadAImm16(n)],
-
-        // If we're here, we hit a syntax error that wasn't caught by the parser.
-        // Return something sensible in this case.  TODO.
-        _ => return vec![],
-    }
-}
+use crate::parser::Parser;
+use crate::symtab::SymTab;
 
 pub fn compile_from_str(input: &str) -> Vec<Ins> {
     let mut p = Parser::new(input);
@@ -46,12 +12,12 @@ pub fn compile_from_str(input: &str) -> Vec<Ins> {
 
     loop {
         if let None = p.next {
-            append(vec![Ins::Return], &mut listing);
+            listing.push(Ins::Return);
             return listing;
         }
 
         let item = p.g_statement();
-        append(cg_item(item, &mut st), &mut listing);
+        listing.extend_from_slice(&cg_item(item, &mut st));
 
         if let Some(Token::Char(';')) = p.next {
             p.skip();
@@ -59,7 +25,7 @@ pub fn compile_from_str(input: &str) -> Vec<Ins> {
             // Statements are to be separated by semicolons.
             // Syntax error if not.
             if p.next != None {
-                return vec![]
+                return vec![];
             }
         }
     }
@@ -103,108 +69,27 @@ fn let_binding() {
     let dp_locals = dp_result + 2;
 
     let result = compile_from_str("let x: u16 = 0;");
-    assert_eq!(result, vec![Ins::LoadAImm16(0), Ins::StoreADP(dp_locals), Ins::Return,]);
+    assert_eq!(
+        result,
+        vec![Ins::LoadAImm16(0), Ins::StoreADP(dp_locals), Ins::Return,]
+    );
 
     let result = compile_from_str("let x: u16 = 1; let y: u16 = 2;");
-    assert_eq!(result, vec![
-        Ins::LoadAImm16(1), Ins::StoreADP(dp_locals),
-        Ins::LoadAImm16(2), Ins::StoreADP(dp_locals+2),
-        Ins::Return,
-    ]);
-}
-
-
-// Using struct-of-arrays helps avoid the need for complicated reference types
-// and pesky lifetime annotations.
-pub struct SymTab {
-    length: usize,
-    names: Vec<String>,
-    offsets: Vec<u16>,
-    next_local: u16,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Symbol<'name_lifetime> {
-    pub name: &'name_lifetime str,
-    pub offset: u16,
-}
-
-impl SymTab {
-    pub fn new() -> Self {
-        SymTab {
-            length: 0,
-            names: Vec::new(),
-            offsets: Vec::new(),
-            next_local: 2,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.length
-    }
-
-    pub fn create_local(&mut self, name: &str) {
-        self.names.push(name.to_string());
-        self.offsets.push(self.next_local);
-        self.length += 1;
-        self.next_local += 2;
-    }
-
-    pub fn find_by_name<'n>(&'n self, name: &'n str) -> Result<Box<Symbol>, Errors> {
-        // If the symbol table is empty, then, by definition,
-        // the symbol cannot be found.
-        if self.length == 0 {
-            return Err(Errors::Undefined);
-        }
-
-        // The current index into the name and offset vectors.
-        //
-        // Since the last inserted symbol will appear at the end of the vector,
-        // and since new symbols take priority over shadowed symbols, we start
-        // our scan at the *end* of the name vector.
-        let mut i: usize = self.length - 1;
-
-        // Try to find the symbol, starting from the tail of the vector and
-        // working our way back to the beginning.
-        loop {
-            let candidate = self.names.get(i).ok_or(Errors::BadSymbolTableIndex)?;
-            if candidate.as_str() == name {
-                break;
-            }
-
-            // Candidate is still on the loose.  We need to look at the next name
-            // in the vector.  However, if we're already at the beginning, then
-            // we've exhausted the search space.  Give up.
-            if i == 0 {
-                return Err(Errors::Undefined);
-            }
-
-            i -= 1;
-        }
-
-        // If we're here, then we must have found a viable candidate.
-        return Ok(Box::new(Symbol{
-            name: name,
-            offset: *self.offsets.get(i).ok_or(Errors::BadSymbolTableIndex)?,
-        }));
-    }
-}
-
-impl Symbol<'_> {
-    pub fn offset(&self) -> u16 {
-        self.offset
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Errors {
-    Undefined,
-    BadSymbolTableIndex,
+    assert_eq!(
+        result,
+        vec![
+            Ins::LoadAImm16(1),
+            Ins::StoreADP(dp_locals),
+            Ins::LoadAImm16(2),
+            Ins::StoreADP(dp_locals + 2),
+            Ins::Return,
+        ]
+    );
 }
 
 mod symbol_table {
-    use super::SymTab;
-    use super::Errors;
+    use crate::symtab::Errors;
+    use crate::symtab::SymTab;
 
     #[test]
     fn new_creates_empty_table() {

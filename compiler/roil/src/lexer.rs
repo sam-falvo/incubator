@@ -96,7 +96,7 @@ impl<'input_lifetime> Lexer<'input_lifetime> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, )]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Char(char),
     Number(usize),
@@ -132,12 +132,10 @@ impl<'input_lifetime> Iterator for Lexer<'input_lifetime> {
 
         // filter keywords out from identifiers
         let id = match id {
-            Some(Token::Id(ref s)) => {
-                match s.as_str() {
-                    "let" => Some(Token::Let),
-                    &_ => id,
-                }
-            }
+            Some(Token::Id(ref s)) => match s.as_str() {
+                "let" => Some(Token::Let),
+                &_ => id,
+            },
 
             _ => id,
         };
