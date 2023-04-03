@@ -1,4 +1,7 @@
+// vim:ts=4:sw=4:et:ai
+
 use crate::lexer::{Lexer, Token};
+use crate::symtab::SymTab;
 
 pub type TargetSInt = i16;
 pub type TargetUInt = u16;
@@ -31,23 +34,116 @@ impl<'input_lifetime> Parser<'input_lifetime> {
         self.next = self.lexer.next();
     }
 
-    pub fn g_expr(&mut self) -> Item {
-        self.g_unary()
+    pub fn g_expr(&mut self, st: &SymTab) -> Item {
+        self.g_sum(st)
     }
 
-    pub fn g_statement(&mut self) -> Item {
-        match self.next {
-            Some(Token::Let) => {
-                self.skip();
-                self.g_let()
-            }
+    pub fn g_sum(&mut self, st: &SymTab) -> Item {
+        let mut lhs = self.g_prod(st);
 
-            _ => self.g_expr(),
+        if let Item::Error(_) = lhs {
+            return lhs;
+        }
+
+        loop {
+            match self.next {
+                Some(Token::Char('+')) => {
+                    self.skip();
+                    let rhs = self.g_prod(st);
+                    if let Item::Error(_) = rhs {
+                        return rhs;
+                    }
+                    lhs = Item::Add(Box::new(lhs), Box::new(rhs));
+                }
+
+                Some(Token::Char('-')) => {
+                    self.skip();
+                    let rhs = self.g_prod(st);
+                    if let Item::Error(_) = rhs {
+                        return rhs;
+                    }
+                    lhs = Item::Sub(Box::new(lhs), Box::new(rhs));
+                }
+
+                _ => return lhs,
+            }
         }
     }
 
-    pub fn g_let(&mut self) -> Item {
-        // Parse "let <id> : u16 = <expr>"
+    pub fn g_prod(&mut self, st: &SymTab) -> Item {
+        self.g_unary(st)
+    }
+
+    pub fn g_unary(&mut self, st: &SymTab) -> Item {
+        match self.next {
+            Some(Token::Char('-')) => {
+                self.skip();
+                let e = self.g_primary(st);
+                negate(e)
+            }
+
+            _ => self.g_primary(st),
+        }
+    }
+
+    pub fn g_primary(&mut self, st: &SymTab) -> Item {
+        match self.next {
+            Some(Token::Number(n)) => {
+                let i = Item::ConstInteger(n as TargetUInt);
+                self.skip();
+                i
+            }
+
+            Some(Token::Id(ref name)) => {
+                let id_or_err = st.find_by_name(&name);
+                let prim = match id_or_err {
+                    Err(_) => Item::Error(ErrType::UndefinedId(name.to_string())),
+                    Ok(sym) => Item::LocalVar(sym.offset as TargetByte),
+                };
+                self.skip();
+                prim
+            }
+
+            _ => Item::Error(ErrType::PrimaryExpected),
+        }
+    }
+
+    pub fn g_statement(&mut self, st: &mut SymTab) -> Item {
+        match self.next {
+            Some(Token::Let) => {
+                self.skip();
+                self.g_let(st)
+            }
+
+            Some(Token::Begin) => {
+                self.skip();
+                self.g_statement_block(st)
+            }
+
+            _ => self.g_expr(st),
+        }
+    }
+
+    pub fn g_statement_block(&mut self, st: &mut SymTab) -> Item {
+        let mut block: Vec<Item> = Vec::new();
+        loop {
+            let s: Item = self.g_statement(st);
+            let s1 = s.clone();
+            if let Item::Error(_) = s1 {
+                return s;
+            } else {
+                block.push(s);
+            }
+            if self.next != Some(Token::Char(';')) {
+                break;
+            }
+            self.skip();
+        }
+        Item::StatementList(block)
+    }
+
+    pub fn g_let(&mut self, st: &mut SymTab) -> Item {
+        // Parse "let <id> = <expr>"
         // The 'let' token was already consumed.
 
         let id: String;
@@ -55,62 +151,42 @@ impl<'input_lifetime> Parser<'input_lifetime> {
             id = s1;
             self.skip();
         } else {
-            return Item::Error;
-        }
-
-        if let Some(Token::Char(':')) = self.next {
-            self.skip();
-        } else {
-            return Item::Error;
-        }
-
-        if let Some(Token::Id(s2)) = self.next.clone() {
-            self.skip();
-            if s2.as_str() != "u16" {
-                return Item::Error;
-            }
-        } else {
-            return Item::Error;
+            return Item::Error(ErrType::IdentifierExpected);
         }
 
         let rval;
         if let Some(Token::Char('=')) = self.next {
             self.skip();
-            rval = self.g_expr();
+            rval = self.g_expr(st);
         } else {
-            return Item::Error;
+            return Item::Error(ErrType::CharExpected('='));
         }
 
+        st.create_local(&id);
         Item::DeclareLocal(id, Box::new(rval))
-    }
-
-    pub fn g_unary(&mut self) -> Item {
-        match self.next {
-            Some(Token::Char('-')) => {
-                self.skip();
-                let e = self.g_primary();
-                negate(e)
-            }
-
-            _ => self.g_primary(),
-        }
-    }
-
-    pub fn g_primary(&mut self) -> Item {
-        match self.next {
-            Some(Token::Number(n)) => {
-                let i = Item::ConstInteger(n as TargetUInt);
-                self.skip();
-                i
-            }
-            _ => Item::Error,
-        }
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub enum ErrType {
+    IdentifierExpected,
+    CharExpected(char),
+    UndefinedId(String),
+    PrimaryExpected,
+
+    // These tend to be used by the code generator.
+    ExpressionExpected,
+    ParserNotFoldingConstants,
+    UnexpectedCGArgs,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub enum Item {
-    Error,
+    Error(ErrType),
     ConstInteger(TargetUInt),
     DeclareLocal(String, Box<Item>),
+    LocalVar(TargetByte),
+    StatementList(Vec<Item>),
+    Add(Box<Item>, Box<Item>),
+    Sub(Box<Item>, Box<Item>),
 }

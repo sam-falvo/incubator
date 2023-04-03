@@ -1,3 +1,5 @@
+// vim:sw=4:ts=4:et:ai
+//
 // Using struct-of-arrays helps avoid the need for complicated reference types
 // and pesky lifetime annotations.
 pub struct SymTab {
@@ -27,11 +29,21 @@ impl SymTab {
         self.length
     }
 
+    pub fn alloc_temp(&mut self) -> u16 {
+        let next_local = self.next_local;
+        self.next_local += 2;
+        next_local
+    }
+
+    pub fn free_temp(&mut self) {
+        self.next_local -= 2;
+    }
+
     pub fn create_local(&mut self, name: &str) {
         self.names.push(name.to_string());
-        self.offsets.push(self.next_local);
+        let t = self.alloc_temp();
+        self.offsets.push(t);
         self.length += 1;
-        self.next_local += 2;
     }
 
     pub fn find_by_name<'n>(&'n self, name: &'n str) -> Result<Box<Symbol>, Errors> {

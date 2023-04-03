@@ -71,8 +71,7 @@ impl<'input_lifetime> Lexer<'input_lifetime> {
             Some('q') | Some('Q') | Some('o') | Some('O') => self.lex_octal_number('0'),
             Some(chr) if (chr >= '0') && (chr <= '7') => self.lex_octal_number(chr),
             Some(chr) if chr.is_ascii_digit() => self.lex_number(chr),
-            Some(_) => Some(Token::Number(0)),
-            None => None,
+            _ => Some(Token::Number(0)),
         }
     }
 
@@ -102,6 +101,7 @@ pub enum Token {
     Number(usize),
     Id(String),
     Let,
+    Begin,
 }
 
 impl<'input_lifetime> Iterator for Lexer<'input_lifetime> {
@@ -134,6 +134,7 @@ impl<'input_lifetime> Iterator for Lexer<'input_lifetime> {
         let id = match id {
             Some(Token::Id(ref s)) => match s.as_str() {
                 "let" => Some(Token::Let),
+                "begin" => Some(Token::Begin),
                 &_ => id,
             },
 
