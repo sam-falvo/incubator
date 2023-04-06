@@ -30,6 +30,8 @@ pub enum Ins {
     SubtractADP(TargetByte),
     SubtractAImm16(TargetUInt),
 
+    StoreZeroDP(TargetByte),
+
     Return,
 }
 
@@ -85,6 +87,13 @@ fn load_a_local(listing: &mut Vec<Ins>, rc_a: &mut RegCache, offset: u8) {
     rc_a.local = Some(offset);
 }
 
+fn store_zero_local(listing: &mut Vec<Ins>, rc_a: &mut RegCache, offset: u8) {
+    listing.push(Ins::StoreZeroDP(offset));
+    if Some(offset) == rc_a.local {
+        rc_a.local = None;
+    }
+}
+
 fn store_a_local(listing: &mut Vec<Ins>, rc_a: &mut RegCache, offset: u8) {
     listing.push(Ins::StoreADP(offset));
     rc_a.local = Some(offset);
@@ -125,8 +134,12 @@ pub fn cg_const_int(n: u16, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> 
     match dd {
         DataDest::RegA | DataDest::Effect => load_a_imm16(&mut listing, rc_a, n),
         DataDest::Local(ofs) => {
-            load_a_imm16(&mut listing, rc_a, n);
-            store_a_local(&mut listing, rc_a, ofs);
+            if n == 0 {
+                store_zero_local(&mut listing, rc_a, ofs);
+            } else {
+                load_a_imm16(&mut listing, rc_a, n);
+                store_a_local(&mut listing, rc_a, ofs);
+            }
         },
     }
 
@@ -347,6 +360,26 @@ pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
     Ok(listing)
 }
 
+pub fn cg_assignment(lhs: Item, rhs: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+    if (dd != DataDest::RegA) && (dd != DataDest::Effect) {
+        return Err(ErrType::UnexpectedCGArgs);
+    }
+
+    match lhs {
+        Item::LocalVar(offset) => {
+            let mut listing: Vec<Ins> = Vec::new();
+
+            listing.extend_from_slice(&cg_item(rhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+            store_a_local(&mut listing, rc_a, offset);
+            listing.extend_from_slice(&cg_goto(cd)?);
+
+            Ok(listing)
+        }
+
+        _ => Err(ErrType::LValExpected),
+    }
+}
+
 pub fn cg_item(item: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
     match item {
         Item::DeclareLocal(id, rval) => cg_declare_local(st, id, *rval, dd, cd, rc_a),
@@ -355,6 +388,7 @@ pub fn cg_item(item: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &m
         Item::StatementList(statements) => cg_statement_list(statements, st, dd, cd, rc_a),
         Item::Add(lhs, rhs) => cg_add(lhs, rhs, st, dd, cd, rc_a),
         Item::Sub(lhs, rhs) => cg_sub(lhs, rhs, st, dd, cd, rc_a),
+        Item::Assign(lhs, rhs) => cg_assignment(*lhs, *rhs, st, dd, cd, rc_a),
 
         _ => Err(ErrType::ExpressionExpected),
     }

@@ -101,7 +101,18 @@ impl<'input_lifetime> Parser<'input_lifetime> {
                     Ok(sym) => Item::LocalVar(sym.offset as TargetByte),
                 };
                 self.skip();
-                prim
+                if let Some(Token::Char(':')) = self.next {
+                    self.skip();
+                    let rhs = self.g_sum(st);
+
+                    if let Item::LocalVar(_) = prim {
+                        Item::Assign(Box::new(prim), Box::new(rhs))
+                    } else {
+                        Item::Error(ErrType::LValExpected)
+                    }
+                } else {
+                    prim
+                }
             }
 
             _ => Item::Error(ErrType::PrimaryExpected),
@@ -173,6 +184,7 @@ pub enum ErrType {
     CharExpected(char),
     UndefinedId(String),
     PrimaryExpected,
+    LValExpected,
 
     // These tend to be used by the code generator.
     ExpressionExpected,
@@ -189,4 +201,5 @@ pub enum Item {
     StatementList(Vec<Item>),
     Add(Box<Item>, Box<Item>),
     Sub(Box<Item>, Box<Item>),
+    Assign(Box<Item>, Box<Item>),
 }

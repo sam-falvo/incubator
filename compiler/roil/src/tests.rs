@@ -53,13 +53,13 @@ fn let_binding() {
     let result = compile_from_str("let x = 0");
     assert_eq!(
         result,
-        Ok(vec![Ins::LoadAImm16(0), Ins::StoreADP(dp_locals), Ins::Return,])
+        Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,])
     );
 
     let result = compile_from_str("begin let x = 0");
     assert_eq!(
         result,
-        Ok(vec![Ins::LoadAImm16(0), Ins::StoreADP(dp_locals), Ins::Return,])
+        Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,])
     );
 
     let result = compile_from_str("begin let x = 1; let y=2");
@@ -90,6 +90,38 @@ fn expressions() {
             Ins::StoreADP(dp_locals+2),
             Ins::AddADP(dp_locals),
             Ins::SubtractAImm16(2),
+            Ins::Return,
+        ])
+    );
+}
+
+#[test]
+fn assignments() {
+    let dp_result = 0;
+    let dp_locals = dp_result + 2;
+
+    let result = compile_from_str("begin let x=0; x: x + 20");
+    assert_eq!(
+        result,
+        Ok(vec![
+            Ins::StoreZeroDP(dp_locals),
+            Ins::LoadADP(dp_locals),
+            Ins::AddAImm16(20),
+            Ins::StoreADP(dp_locals),
+            Ins::Return,
+        ])
+    );
+
+    let result = compile_from_str("begin let x=0; let y=0; y: x: x + 20");
+    assert_eq!(
+        result,
+        Ok(vec![
+            Ins::StoreZeroDP(dp_locals),
+            Ins::StoreZeroDP(dp_locals+2),
+            Ins::LoadADP(dp_locals),
+            Ins::AddAImm16(20),
+            Ins::StoreADP(dp_locals),
+            Ins::StoreADP(dp_locals+2),
             Ins::Return,
         ])
     );
