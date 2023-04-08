@@ -14,7 +14,7 @@ pub fn compile_from_str(input: &str) -> Result<Vec<Ins>, ErrType> {
 }
 
 #[test]
-fn unsigned_integer() {
+fn integers() {
     let result = compile_from_str("42");
     assert_eq!(result, Ok(vec![Ins::LoadAImm16(42), Ins::Return,]));
 
