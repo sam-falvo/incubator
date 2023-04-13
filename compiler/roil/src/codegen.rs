@@ -1,6 +1,6 @@
 // vim:ts=4:sw=4:et:ai
 
-use crate::parser::{Item, TargetByte, TargetUInt, ErrType};
+use crate::parser::{ErrType, Item, TargetByte, TargetUInt};
 use crate::symtab::SymTab;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -15,7 +15,6 @@ pub enum DataDest {
     RegA,
     Local(u8),
 }
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Ins {
@@ -127,8 +126,12 @@ fn subtract_a_local(listing: &mut Vec<Ins>, rc_a: &mut RegCache, offset: u8) {
     rc_a.local = None;
 }
 
-
-pub fn cg_const_int(n: u16, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_const_int(
+    n: u16,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
 
     match dd {
@@ -140,20 +143,33 @@ pub fn cg_const_int(n: u16, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> 
                 load_a_imm16(&mut listing, rc_a, n);
                 store_a_local(&mut listing, rc_a, ofs);
             }
-        },
+        }
     }
 
     listing.extend_from_slice(&cg_goto(cd)?);
     Ok(listing)
 }
 
-pub fn cg_declare_local(st: &mut SymTab, id: String, rval: Item, _dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_declare_local(
+    st: &mut SymTab,
+    id: String,
+    rval: Item,
+    _dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
 
     match st.find_by_name(&id) {
         Ok(sym) => {
             let offset = sym.offset as u8;
-            listing.extend_from_slice(&cg_item(rval, st, DataDest::Local(offset), CtrlDest::Next, rc_a)?);
+            listing.extend_from_slice(&cg_item(
+                rval,
+                st,
+                DataDest::Local(offset),
+                CtrlDest::Next,
+                rc_a,
+            )?);
         }
 
         _ => return Err(ErrType::UndefinedId(id.clone())),
@@ -163,7 +179,12 @@ pub fn cg_declare_local(st: &mut SymTab, id: String, rval: Item, _dd: DataDest, 
     Ok(listing)
 }
 
-pub fn cg_local(offset: u8, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_local(
+    offset: u8,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
 
     match dd {
@@ -179,7 +200,13 @@ pub fn cg_local(offset: u8, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> 
     Ok(listing)
 }
 
-pub fn cg_statement_list(statements: Vec<Item>, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_statement_list(
+    statements: Vec<Item>,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
     let length = statements.len();
 
@@ -187,7 +214,13 @@ pub fn cg_statement_list(statements: Vec<Item>, st: &mut SymTab, dd: DataDest, c
         let last = length - 1;
 
         for i in 0..last {
-            listing.extend_from_slice(&cg_item(statements[i].clone(), st, DataDest::Effect, CtrlDest::Next, rc_a)?);
+            listing.extend_from_slice(&cg_item(
+                statements[i].clone(),
+                st,
+                DataDest::Effect,
+                CtrlDest::Next,
+                rc_a,
+            )?);
         }
         listing.extend_from_slice(&cg_item(statements[last].clone(), st, dd, cd, rc_a)?);
     }
@@ -195,7 +228,14 @@ pub fn cg_statement_list(statements: Vec<Item>, st: &mut SymTab, dd: DataDest, c
     Ok(listing)
 }
 
-pub fn cg_add(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_add(
+    lhs: Box<Item>,
+    rhs: Box<Item>,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
 
     // const + const            ERROR: parser not folding constants
@@ -221,25 +261,25 @@ pub fn cg_add(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
         Item::ConstInteger(_) => match *rhs {
             Item::ConstInteger(_) => return Err(ErrType::ParserNotFoldingConstants),
             _ => (),
-        }
+        },
 
         Item::LocalVar(_) => match *rhs {
             Item::ConstInteger(_) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             _ => (),
-        }
+        },
 
         Item::Add(_, _) => match *rhs {
             Item::ConstInteger(_) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             Item::LocalVar(_) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             _ => (),
-        }
+        },
 
         Item::Sub(_, _) => match *rhs {
             Item::ConstInteger(_) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             Item::LocalVar(_) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             Item::Add(_, _) => return cg_add(rhs, lhs, st, dd, cd, rc_a),
             _ => (),
-        }
+        },
 
         _ => return Err(ErrType::UnexpectedCGArgs),
     }
@@ -247,7 +287,13 @@ pub fn cg_add(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
     match *lhs {
         Item::ConstInteger(n) => match *rhs {
             Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
-                listing.extend_from_slice(&cg_item(*rhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *rhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 if n == 1 {
                     increment_a(&mut listing, rc_a);
                 } else if n == !0 {
@@ -258,28 +304,46 @@ pub fn cg_add(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         Item::LocalVar(offset) => match *rhs {
             Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
-                listing.extend_from_slice(&cg_item(*rhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *rhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 add_a_local(&mut listing, rc_a, offset);
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         Item::Add(_, _) | Item::Sub(_, _) => match *rhs {
             Item::Add(_, _) | Item::Sub(_, _) => {
                 let t: u8 = st.alloc_temp() as u8;
-                listing.extend_from_slice(&cg_item(*lhs, st, DataDest::Local(t), CtrlDest::Next, rc_a)?);
-                listing.extend_from_slice(&cg_item(*rhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *lhs,
+                    st,
+                    DataDest::Local(t),
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
+                listing.extend_from_slice(&cg_item(
+                    *rhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 add_a_local(&mut listing, rc_a, t as u8);
                 st.free_temp();
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         _ => return Err(ErrType::UnexpectedCGArgs),
     }
@@ -289,7 +353,14 @@ pub fn cg_add(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
     Ok(listing)
 }
 
-pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_sub(
+    lhs: Box<Item>,
+    rhs: Box<Item>,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     let mut listing: Vec<Ins> = Vec::new();
 
     // const - const            ERROR: parser not folding constants
@@ -314,7 +385,13 @@ pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
             Item::ConstInteger(_) => return Err(ErrType::ParserNotFoldingConstants),
 
             Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
-                listing.extend_from_slice(&cg_item(*lhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *lhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 if m == 1 {
                     decrement_a(&mut listing, rc_a);
                 } else if m == !0 {
@@ -327,24 +404,42 @@ pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         Item::LocalVar(ofs) => match *lhs {
             Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
-                listing.extend_from_slice(&cg_item(*lhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *lhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 subtract_a_local(&mut listing, rc_a, ofs);
                 listing.extend_from_slice(&cg_store_a(dd, rc_a)?);
                 listing.extend_from_slice(&cg_goto(cd)?);
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         Item::Add(_, _) | Item::Sub(_, _) => match *lhs {
             Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
                 let t: TargetByte = st.alloc_temp() as TargetByte;
-                listing.extend_from_slice(&cg_item(*lhs, st, DataDest::Local(t), CtrlDest::Next, rc_a)?);
-                listing.extend_from_slice(&cg_item(*rhs, st, DataDest::RegA, CtrlDest::Next, rc_a)?);
+                listing.extend_from_slice(&cg_item(
+                    *lhs,
+                    st,
+                    DataDest::Local(t),
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
+                listing.extend_from_slice(&cg_item(
+                    *rhs,
+                    st,
+                    DataDest::RegA,
+                    CtrlDest::Next,
+                    rc_a,
+                )?);
                 subtract_a_local(&mut listing, rc_a, t);
                 listing.extend_from_slice(&cg_store_a(dd, rc_a)?);
                 listing.extend_from_slice(&cg_goto(cd)?);
@@ -352,7 +447,7 @@ pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
             }
 
             _ => return Err(ErrType::UnexpectedCGArgs),
-        }
+        },
 
         _ => return Err(ErrType::UnexpectedCGArgs),
     }
@@ -360,7 +455,14 @@ pub fn cg_sub(lhs: Box<Item>, rhs: Box<Item>, st: &mut SymTab, dd: DataDest, cd:
     Ok(listing)
 }
 
-pub fn cg_assignment(lhs: Item, rhs: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_assignment(
+    lhs: Item,
+    rhs: Item,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     if (dd != DataDest::RegA) && (dd != DataDest::Effect) {
         return Err(ErrType::UnexpectedCGArgs);
     }
@@ -380,7 +482,13 @@ pub fn cg_assignment(lhs: Item, rhs: Item, st: &mut SymTab, dd: DataDest, cd: Ct
     }
 }
 
-pub fn cg_item(item: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &mut RegCache) -> Result<Vec<Ins>, ErrType> {
+pub fn cg_item(
+    item: Item,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
     match item {
         Item::DeclareLocal(id, rval) => cg_declare_local(st, id, *rval, dd, cd, rc_a),
         Item::ConstInteger(n) => cg_const_int(n, dd, cd, rc_a),
@@ -396,8 +504,8 @@ pub fn cg_item(item: Item, st: &mut SymTab, dd: DataDest, cd: CtrlDest, rc_a: &m
 
 pub fn cg_goto(cd: CtrlDest) -> Result<Vec<Ins>, ErrType> {
     match cd {
-        CtrlDest::Next => Ok(vec![]),               // just drop through to next instruction
-        CtrlDest::Return => Ok(vec![Ins::Return]),  // return from current subroutine
+        CtrlDest::Next => Ok(vec![]), // just drop through to next instruction
+        CtrlDest::Return => Ok(vec![Ins::Return]), // return from current subroutine
     }
 }
 

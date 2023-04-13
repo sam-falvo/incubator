@@ -2,77 +2,127 @@
 
 mod unit {
     mod cg {
+        use crate::codegen::{cg_item, CtrlDest, DataDest, Ins, RegCache};
         use crate::parser::Item;
-        use crate::codegen::{cg_item, Ins, DataDest, CtrlDest, RegCache};
         use crate::symtab::SymTab;
 
         #[test]
         fn local_declarations() {
             let mut st = SymTab::new();
             st.create_local(&"x".to_string());
-            let result = cg_item(Item::DeclareLocal("x".to_string(), Box::new(Item::ConstInteger(42))), &mut st, DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
-            assert_eq!(result, Ok(vec![
-                Ins::LoadAImm16(42),
-                Ins::StoreADP(2),
-                Ins::Return,
-            ]));
+            let result = cg_item(
+                Item::DeclareLocal("x".to_string(), Box::new(Item::ConstInteger(42))),
+                &mut st,
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(
+                result,
+                Ok(vec![Ins::LoadAImm16(42), Ins::StoreADP(2), Ins::Return,])
+            );
         }
 
         #[test]
         fn integers() {
-            let result = cg_item(Item::ConstInteger(42), &mut SymTab::new(), DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
+            let result = cg_item(
+                Item::ConstInteger(42),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
             assert_eq!(result, Ok(vec![Ins::LoadAImm16(42), Ins::Return,]));
         }
 
         #[test]
         fn local_access() {
-            let result = cg_item(Item::LocalVar(24), &mut SymTab::new(), DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
-            assert_eq!(result, Ok(vec![
-                Ins::LoadADP(24),
-                Ins::Return,
-            ]));
+            let result = cg_item(
+                Item::LocalVar(24),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(result, Ok(vec![Ins::LoadADP(24), Ins::Return,]));
         }
 
         #[test]
         fn statement_list() {
-            let result = cg_item(Item::StatementList(vec![
-                Item::LocalVar(42),
-                Item::Assign(Box::new(Item::LocalVar(36)), Box::new(Item::ConstInteger(99))),
-                Item::LocalVar(24),
-            ]), &mut SymTab::new(), DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
-            assert_eq!(result, Ok(vec![
-                Ins::LoadAImm16(99), Ins::StoreADP(36),
-                Ins::LoadADP(24),
-                Ins::Return,
-            ]));
+            let result = cg_item(
+                Item::StatementList(vec![
+                    Item::LocalVar(42),
+                    Item::Assign(
+                        Box::new(Item::LocalVar(36)),
+                        Box::new(Item::ConstInteger(99)),
+                    ),
+                    Item::LocalVar(24),
+                ]),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(
+                result,
+                Ok(vec![
+                    Ins::LoadAImm16(99),
+                    Ins::StoreADP(36),
+                    Ins::LoadADP(24),
+                    Ins::Return,
+                ])
+            );
         }
 
         #[test]
         fn add_sub() {
-            let result = cg_item(Item::Add(Box::new(Item::LocalVar(2)), Box::new(Item::Sub(Box::new(Item::LocalVar(4)), Box::new(Item::LocalVar(6))))), &mut SymTab::new(), DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
-            assert_eq!(result, Ok(vec![
-                Ins::LoadADP(4),
-                Ins::SubtractADP(6),
-                Ins::AddADP(2),
-                Ins::Return,
-            ]));
+            let result = cg_item(
+                Item::Add(
+                    Box::new(Item::LocalVar(2)),
+                    Box::new(Item::Sub(
+                        Box::new(Item::LocalVar(4)),
+                        Box::new(Item::LocalVar(6)),
+                    )),
+                ),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(
+                result,
+                Ok(vec![
+                    Ins::LoadADP(4),
+                    Ins::SubtractADP(6),
+                    Ins::AddADP(2),
+                    Ins::Return,
+                ])
+            );
         }
 
         #[test]
         fn assignment() {
-            let result = cg_item(Item::Assign(Box::new(Item::LocalVar(36)), Box::new(Item::ConstInteger(99))),
-            &mut SymTab::new(), DataDest::RegA, CtrlDest::Return, &mut RegCache::new());
-            assert_eq!(result, Ok(vec![
-                Ins::LoadAImm16(99), Ins::StoreADP(36),
-                Ins::Return,
-            ]));
+            let result = cg_item(
+                Item::Assign(
+                    Box::new(Item::LocalVar(36)),
+                    Box::new(Item::ConstInteger(99)),
+                ),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(
+                result,
+                Ok(vec![Ins::LoadAImm16(99), Ins::StoreADP(36), Ins::Return,])
+            );
         }
     }
 }
 
 mod acceptance {
-    use crate::codegen::{cg_item, Ins, DataDest, CtrlDest, RegCache};
-    use crate::parser::{Parser, ErrType};
+    use crate::codegen::{cg_item, CtrlDest, DataDest, Ins, RegCache};
+    use crate::parser::{ErrType, Parser};
     use crate::symtab::SymTab;
 
     pub fn compile_from_str(input: &str) -> Result<Vec<Ins>, ErrType> {
@@ -122,16 +172,10 @@ mod acceptance {
         let dp_locals = dp_result + 2;
 
         let result = compile_from_str("let x = 0");
-        assert_eq!(
-            result,
-            Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,])
-        );
+        assert_eq!(result, Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,]));
 
         let result = compile_from_str("begin let x = 0");
-        assert_eq!(
-            result,
-            Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,])
-        );
+        assert_eq!(result, Ok(vec![Ins::StoreZeroDP(dp_locals), Ins::Return,]));
 
         let result = compile_from_str("begin let x = 1; let y=2");
         assert_eq!(
@@ -158,7 +202,7 @@ mod acceptance {
                 Ins::LoadAImm16(1),
                 Ins::StoreADP(dp_locals),
                 Ins::LoadAImm16(2),
-                Ins::StoreADP(dp_locals+2),
+                Ins::StoreADP(dp_locals + 2),
                 Ins::AddADP(dp_locals),
                 Ins::SubtractAImm16(2),
                 Ins::Return,
@@ -188,11 +232,11 @@ mod acceptance {
             result,
             Ok(vec![
                 Ins::StoreZeroDP(dp_locals),
-                Ins::StoreZeroDP(dp_locals+2),
+                Ins::StoreZeroDP(dp_locals + 2),
                 Ins::LoadADP(dp_locals),
                 Ins::AddAImm16(20),
                 Ins::StoreADP(dp_locals),
-                Ins::StoreADP(dp_locals+2),
+                Ins::StoreADP(dp_locals + 2),
                 Ins::Return,
             ])
         );
