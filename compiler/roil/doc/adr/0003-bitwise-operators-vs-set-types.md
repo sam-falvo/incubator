@@ -207,7 +207,7 @@ I propose the following steps be taken to move forward with an Oberon-style,
 type-based solution.  I follow the basic philosophy of "working backwards."
 
 1.  Update code generator to accept programs in the form of call trees instead of Item trees.
-    1.  Based on the current set of acceptance tests, define a set of unit tests for the current code generator.  Refactor production code accordingly.
+    1.  **DONE**.  Based on the current set of acceptance tests, define a set of unit tests for the current code generator.  Refactor production code accordingly.
     1.  Introduce a new set of tests, essentially identical to the current set, but which expresses the same syntax tree using a generic Apply Item variant.  Alter production code so that handling these new call trees produces identical results to the older set of tests.  Leave legacy code in place, so that acceptance tests remain valid.
     1.  At this point, the code generator should be support the Apply Item variant for expression evaluation.  Bitsets are not yet supported.  Acceptance tests still pass.
 1.  Update the parser to use the Apply Item instead of dedicated Item nodes.  At each step, acceptance tests must continue to pass.
