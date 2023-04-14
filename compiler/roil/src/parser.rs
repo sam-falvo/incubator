@@ -190,6 +190,7 @@ pub enum ErrType {
     ExpressionExpected,
     ParserNotFoldingConstants,
     UnexpectedCGArgs,
+    UnexpectedApplyOp,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -202,4 +203,19 @@ pub enum Item {
     Add(Box<Item>, Box<Item>),
     Sub(Box<Item>, Box<Item>),
     Assign(Box<Item>, Box<Item>),
+    Apply(Type, Op, Box<Item>, Box<Item>),
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Type {
+    // Unsigned 16-bit integer
+    Cardinal,
+    // Cardinal-sized bit set
+    BitSet,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Op {
+    Add,
+    Subtract,
 }

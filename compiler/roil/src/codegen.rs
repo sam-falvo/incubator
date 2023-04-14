@@ -1,7 +1,10 @@
 // vim:ts=4:sw=4:et:ai
 
-use crate::parser::{ErrType, Item, TargetByte, TargetUInt};
+use crate::parser::{ErrType, Item, TargetByte, TargetUInt, Op};
 use crate::symtab::SymTab;
+
+const NEG_1: u16 = !0;
+const NEG_2: u16 = !1;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CtrlDest {
@@ -242,18 +245,27 @@ pub fn cg_add(
     // const + localVar         fetch local, add constant
     // const + add              calculate sum, add constant
     // const + sub              calculate diff, add constant
+    // const + appl             calculate application, add constant
     // localVar + const         swap; recurse
     // localVar + localVar      fetch local, add local
     // localVar + add           calculate sum, add local
     // localVar + sub           calculate diff, add local
+    // localVar + appl          calculate application, add local
     // add + const              swap; recurse
     // add + localVar           swap; recurse
     // add + add                alloc temp; t = rhs; calc lhs; add t; free temp
     // add + sub                alloc temp; t = rhs; calc lhs; add t; free temp
+    // add + appl               alloc temp; t = rhs; calc lhs; add t; free temp
     // sub + const              swap; recurse
     // sub + localVar           swap; recurse
     // sub + add                swap; recurse
     // sub + sub                alloc temp; t = rhs; calc lhs; add t; free temp
+    // sub + appl               alloc temp; t = rhs; calc lhs; add t; free temp
+    // appl + const             swap; recurse
+    // appl + localVar          swap; recurse
+    // appl + add               swap; recurse
+    // appl + sub               swap; recurse
+    // appl + appl              alloc temp; t = rhs; calc lhs; add t; free temp
 
     // Take advantage of addition's commutative property to reduce the amount of
     // special-case code we need to implement.
@@ -281,12 +293,19 @@ pub fn cg_add(
             _ => (),
         },
 
+        Item::Apply(_, _, _, _) => match *rhs {
+            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+                return cg_add(rhs, lhs, st, dd, cd, rc_a)
+            }
+            _ => (),
+        },
+
         _ => return Err(ErrType::UnexpectedCGArgs),
     }
 
     match *lhs {
         Item::ConstInteger(n) => match *rhs {
-            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 listing.extend_from_slice(&cg_item(
                     *rhs,
                     st,
@@ -294,12 +313,19 @@ pub fn cg_add(
                     CtrlDest::Next,
                     rc_a,
                 )?);
-                if n == 1 {
-                    increment_a(&mut listing, rc_a);
-                } else if n == !0 {
-                    decrement_a(&mut listing, rc_a);
-                } else {
-                    add_a_imm16(&mut listing, rc_a, n);
+                match n {
+                    NEG_2 => {
+                        decrement_a(&mut listing, rc_a);
+                        decrement_a(&mut listing, rc_a);
+                    }
+                    NEG_1 => decrement_a(&mut listing, rc_a),
+                    0 => (),
+                    1 => increment_a(&mut listing, rc_a),
+                    2 => {
+                        increment_a(&mut listing, rc_a);
+                        increment_a(&mut listing, rc_a);
+                    },
+                    _ => add_a_imm16(&mut listing, rc_a, n),
                 }
             }
 
@@ -307,7 +333,7 @@ pub fn cg_add(
         },
 
         Item::LocalVar(offset) => match *rhs {
-            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _)  => {
                 listing.extend_from_slice(&cg_item(
                     *rhs,
                     st,
@@ -321,8 +347,8 @@ pub fn cg_add(
             _ => return Err(ErrType::UnexpectedCGArgs),
         },
 
-        Item::Add(_, _) | Item::Sub(_, _) => match *rhs {
-            Item::Add(_, _) | Item::Sub(_, _) => {
+        Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => match *rhs {
+            Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 let t: u8 = st.alloc_temp() as u8;
                 listing.extend_from_slice(&cg_item(
                     *lhs,
@@ -367,24 +393,33 @@ pub fn cg_sub(
     // const - localVar         load const, subtract local
     // const - add              alloc temp; t = rhs; load const; subtract t; free temp
     // const - sub              alloc temp; t = rhs; load const; subtract t; free temp
+    // const - appl             alloc temp; t = rhs; load const; subtract t; free temp
     // localVar - const         load local; subtract const
     // localVar - localVar      load local, subtract local
     // localVar - add           alloc temp; t = rhs; load local; subtract t; free temp
     // localVar - sub           alloc temp; t = rhs; load local; subtract t; free temp
+    // localVar - appl          alloc temp; t = rhs; load local; subtract t; free temp
     // add - const              gen lhs; subtract constant
     // add - localVar           gen lhs; subtract local
     // add - add                alloc temp; t = rhs; gen lhs; subtract t; free temp
     // add - sub                alloc temp; t = rhs; gen lhs; subtract t; free temp
+    // add - appl               alloc temp; t = rhs; gen lhs; subtract t; free temp
     // sub - const              same as add-const
     // sub - localVar           same as add-local
     // sub - add                same as add-add
     // sub - sub                same as add-sub
+    // sub - appl               same as add-appl
+    // appl - const             same as add-const
+    // appl - localVar          same as add-local
+    // appl - add               same as add-add
+    // appl - sub               same as add-sub
+    // appl - appl              alloc temp; t = rhs; gen lhs; subtract t; free temp
 
     match *rhs {
         Item::ConstInteger(m) => match *lhs {
             Item::ConstInteger(_) => return Err(ErrType::ParserNotFoldingConstants),
 
-            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 listing.extend_from_slice(&cg_item(
                     *lhs,
                     st,
@@ -392,12 +427,19 @@ pub fn cg_sub(
                     CtrlDest::Next,
                     rc_a,
                 )?);
-                if m == 1 {
-                    decrement_a(&mut listing, rc_a);
-                } else if m == !0 {
-                    increment_a(&mut listing, rc_a);
-                } else {
-                    subtract_a_imm16(&mut listing, rc_a, m);
+                match m {
+                    NEG_2 => {
+                        increment_a(&mut listing, rc_a);
+                        increment_a(&mut listing, rc_a);
+                    },
+                    NEG_1 => increment_a(&mut listing, rc_a),
+                    0 => (),
+                    1 => decrement_a(&mut listing, rc_a),
+                    2 => {
+                        decrement_a(&mut listing, rc_a);
+                        decrement_a(&mut listing, rc_a);
+                    },
+                    _ => subtract_a_imm16(&mut listing, rc_a, m),
                 }
                 listing.extend_from_slice(&cg_store_a(dd, rc_a)?);
                 listing.extend_from_slice(&cg_goto(cd)?);
@@ -407,7 +449,7 @@ pub fn cg_sub(
         },
 
         Item::LocalVar(ofs) => match *lhs {
-            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 listing.extend_from_slice(&cg_item(
                     *lhs,
                     st,
@@ -423,18 +465,18 @@ pub fn cg_sub(
             _ => return Err(ErrType::UnexpectedCGArgs),
         },
 
-        Item::Add(_, _) | Item::Sub(_, _) => match *lhs {
-            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) => {
+        Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => match *lhs {
+            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 let t: TargetByte = st.alloc_temp() as TargetByte;
                 listing.extend_from_slice(&cg_item(
-                    *lhs,
+                    *rhs,
                     st,
                     DataDest::Local(t),
                     CtrlDest::Next,
                     rc_a,
                 )?);
                 listing.extend_from_slice(&cg_item(
-                    *rhs,
+                    *lhs,
                     st,
                     DataDest::RegA,
                     CtrlDest::Next,
@@ -482,6 +524,23 @@ pub fn cg_assignment(
     }
 }
 
+fn cg_apply(
+    op: Op,
+    lhs: Box<Item>,
+    rhs: Box<Item>,
+    st: &mut SymTab,
+    dd: DataDest,
+    cd: CtrlDest,
+    rc_a: &mut RegCache,
+) -> Result<Vec<Ins>, ErrType> {
+    // rtype holds the result type.  We don't need to worry about it, as the
+    // parser has taken care of type enforcement for us.
+    match op {
+        Op::Add => cg_add(lhs, rhs, st, dd, cd, rc_a),
+        Op::Subtract => cg_sub(lhs, rhs, st, dd, cd, rc_a),
+    }
+}
+
 pub fn cg_item(
     item: Item,
     st: &mut SymTab,
@@ -497,7 +556,7 @@ pub fn cg_item(
         Item::Add(lhs, rhs) => cg_add(lhs, rhs, st, dd, cd, rc_a),
         Item::Sub(lhs, rhs) => cg_sub(lhs, rhs, st, dd, cd, rc_a),
         Item::Assign(lhs, rhs) => cg_assignment(*lhs, *rhs, st, dd, cd, rc_a),
-
+        Item::Apply(_rtype, op, lhs, rhs) => cg_apply(op, lhs, rhs, st, dd, cd, rc_a),
         _ => Err(ErrType::ExpressionExpected),
     }
 }
