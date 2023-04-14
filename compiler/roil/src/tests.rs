@@ -75,6 +75,24 @@ mod unit {
         }
 
         #[test]
+        fn assignment() {
+            let result = cg_item(
+                Item::Assign(
+                    Box::new(Item::LocalVar(36)),
+                    Box::new(Item::ConstInteger(99)),
+                ),
+                &mut SymTab::new(),
+                DataDest::RegA,
+                CtrlDest::Return,
+                &mut RegCache::new(),
+            );
+            assert_eq!(
+                result,
+                Ok(vec![Ins::LoadAImm16(99), Ins::StoreADP(36), Ins::Return,])
+            );
+        }
+
+        #[test]
         fn add_sub() {
             let result = cg_item(
                 Item::Add(
@@ -97,24 +115,6 @@ mod unit {
                     Ins::AddADP(2),
                     Ins::Return,
                 ])
-            );
-        }
-
-        #[test]
-        fn assignment() {
-            let result = cg_item(
-                Item::Assign(
-                    Box::new(Item::LocalVar(36)),
-                    Box::new(Item::ConstInteger(99)),
-                ),
-                &mut SymTab::new(),
-                DataDest::RegA,
-                CtrlDest::Return,
-                &mut RegCache::new(),
-            );
-            assert_eq!(
-                result,
-                Ok(vec![Ins::LoadAImm16(99), Ins::StoreADP(36), Ins::Return,])
             );
         }
     }
