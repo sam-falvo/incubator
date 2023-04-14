@@ -175,14 +175,22 @@ well-known procedures or functions, then we get the following benefits:
    dispatch to a subroutine that handles X anyway; but this now becomes an
    *implementation detail*, hidden from the external interface of the code
    generator.)
-2. Well-known symbol names that conform to normal naming conventions allows for
+2. The code generator becomes easier to implement due to a reduction in the
+   combinatorial explosion of cases to consider.  For example, consider the +
+   operator for integers.  If you want to evaluate loclaVar + rhs, there's a
+   separate case for addition, subtraction, multiplication, etc. on the rhs.  All
+   we really care about is that the types are correct; we don't care about the
+   specific operation.  We want the ability to invoke `cg_item(rhs)` and just
+   confirm that the result has the correct type.  We ought not care about the
+   specific kind of rhs.
+3. Well-known symbol names that conform to normal naming conventions allows for
    the possibility of supporting overloading directly within the language later
    on.  Consider how Ada supports overloading based on parameter types.  Consider
    also that the 65816 lacks a multiply or divide instruction, while an 80286
    supports them.  Thus, the runtimes for these two CPUs would need to differ
    based on what instructions are available to use or not.  Features that are
    missing must be made up for using well-known procedures.
-3. Equivalences can be effortlessly supported in the code generator.
+4. Equivalences can be effortlessly supported in the code generator.
    `SET_DIFF(x,y)` can be handled by constructing a temporary `AND(x,NOT(y))` tree
    and recursing into the code generator.  This is equivalent to term-rewriting
    optimization rules found in many other compilers for better known languages.
