@@ -63,7 +63,6 @@ fn type_of(i: &Item) -> Type {
     }
 }
 
-
 impl<'input_lifetime> Parser<'input_lifetime> {
     pub fn new(input: &'input_lifetime str) -> Self {
         let mut p = Self {

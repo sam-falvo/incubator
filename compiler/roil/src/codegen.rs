@@ -1,6 +1,6 @@
 // vim:ts=4:sw=4:et:ai
 
-use crate::parser::{ErrType, Item, TargetByte, TargetUInt, Op};
+use crate::parser::{ErrType, Item, Op, TargetByte, TargetUInt};
 use crate::symtab::SymTab;
 
 const NEG_1: u16 = !0;
@@ -324,7 +324,7 @@ pub fn cg_add(
                     2 => {
                         increment_a(&mut listing, rc_a);
                         increment_a(&mut listing, rc_a);
-                    },
+                    }
                     _ => add_a_imm16(&mut listing, rc_a, n),
                 }
             }
@@ -333,7 +333,7 @@ pub fn cg_add(
         },
 
         Item::LocalVar(offset) => match *rhs {
-            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _)  => {
+            Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
                 listing.extend_from_slice(&cg_item(
                     *rhs,
                     st,
@@ -431,14 +431,14 @@ pub fn cg_sub(
                     NEG_2 => {
                         increment_a(&mut listing, rc_a);
                         increment_a(&mut listing, rc_a);
-                    },
+                    }
                     NEG_1 => increment_a(&mut listing, rc_a),
                     0 => (),
                     1 => decrement_a(&mut listing, rc_a),
                     2 => {
                         decrement_a(&mut listing, rc_a);
                         decrement_a(&mut listing, rc_a);
-                    },
+                    }
                     _ => subtract_a_imm16(&mut listing, rc_a, m),
                 }
                 listing.extend_from_slice(&cg_store_a(dd, rc_a)?);
@@ -449,7 +449,11 @@ pub fn cg_sub(
         },
 
         Item::LocalVar(ofs) => match *lhs {
-            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
+            Item::ConstInteger(_)
+            | Item::LocalVar(_)
+            | Item::Add(_, _)
+            | Item::Sub(_, _)
+            | Item::Apply(_, _, _, _) => {
                 listing.extend_from_slice(&cg_item(
                     *lhs,
                     st,
@@ -466,7 +470,11 @@ pub fn cg_sub(
         },
 
         Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => match *lhs {
-            Item::ConstInteger(_) | Item::LocalVar(_) | Item::Add(_, _) | Item::Sub(_, _) | Item::Apply(_, _, _, _) => {
+            Item::ConstInteger(_)
+            | Item::LocalVar(_)
+            | Item::Add(_, _)
+            | Item::Sub(_, _)
+            | Item::Apply(_, _, _, _) => {
                 let t: TargetByte = st.alloc_temp() as TargetByte;
                 listing.extend_from_slice(&cg_item(
                     *rhs,
