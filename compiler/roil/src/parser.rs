@@ -19,6 +19,51 @@ fn negate(i: Item) -> Item {
     }
 }
 
+fn type_mismatch(lhs: &Item, rhs: &Item) -> bool {
+    return !type_match(lhs, rhs);
+}
+
+fn type_match(lhs: &Item, rhs: &Item) -> bool {
+    let lht = type_of(lhs);
+    let rht = type_of(rhs);
+
+    // Error types never match.
+    (lht == rht) && (lht != Type::Error)
+}
+
+fn type_of(i: &Item) -> Type {
+    match i {
+        // The type of an error item is always the error (bottom) type.
+        Item::Error(_) => Type::Error,
+
+        // Root types
+        Item::ConstInteger(_) => Type::Cardinal,
+        Item::LocalVar(_) => Type::Cardinal,
+
+        // Local declarations take on the type on the rhs.
+        Item::DeclareLocal(_, rhs) => type_of(&rhs),
+
+        // The type of a statement block is the type of the last statement.
+        // If the block is empty, then the type is Unit.
+        Item::StatementList(items) => {
+            let maybe_last_item = items.last();
+            match maybe_last_item {
+                Some(last_item) => type_of(last_item),
+                _ => Type::Unit,
+            }
+        }
+
+        // The type of an assignment is, like declarations, the rhs.
+        Item::Assign(_, rhs) => type_of(&rhs),
+
+        // The type of an expression calculation is the type of the result thereof.
+        Item::Add(lhs, _) => type_of(&lhs),
+        Item::Sub(lhs, _) => type_of(&lhs),
+        Item::Apply(rtype, _, _, _) => rtype.clone(),
+    }
+}
+
+
 impl<'input_lifetime> Parser<'input_lifetime> {
     pub fn new(input: &'input_lifetime str) -> Self {
         let mut p = Self {
@@ -47,13 +92,22 @@ impl<'input_lifetime> Parser<'input_lifetime> {
 
         loop {
             match self.next {
-                Some(Token::Char('+')) => {
+                Some(Token::Char('+')) | Some(Token::Char('-')) => {
+                    let Some(Token::Char(operator)) = self.next else { unreachable!() };
                     self.skip();
                     let rhs = self.g_prod(st);
                     if let Item::Error(_) = rhs {
                         return rhs;
+                    } else if type_mismatch(&lhs, &rhs) {
+                        return Item::Error(ErrType::TypeMismatch);
+                    } else {
+                        let op = match operator {
+                            '+' => Op::Add,
+                            '-' => Op::Subtract,
+                            _ => unreachable!(),
+                        };
+                        lhs = Item::Apply(Type::Cardinal, op, Box::new(lhs), Box::new(rhs));
                     }
-                    lhs = Item::Add(Box::new(lhs), Box::new(rhs));
                 }
 
                 Some(Token::Char('-')) => {
@@ -185,6 +239,7 @@ pub enum ErrType {
     UndefinedId(String),
     PrimaryExpected,
     LValExpected,
+    TypeMismatch,
 
     // These tend to be used by the code generator.
     ExpressionExpected,
@@ -208,7 +263,11 @@ pub enum Item {
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Type {
-    // Unsigned 16-bit integer
+    // The type of no type at all.
+    Unit,
+    // The type of all compiler errors (never matches, even against itself).
+    Error,
+    // Unsigned integer
     Cardinal,
     // Cardinal-sized bit set
     BitSet,
