@@ -109,15 +109,6 @@ impl<'input_lifetime> Parser<'input_lifetime> {
                     }
                 }
 
-                Some(Token::Char('-')) => {
-                    self.skip();
-                    let rhs = self.g_prod(st);
-                    if let Item::Error(_) = rhs {
-                        return rhs;
-                    }
-                    lhs = Item::Sub(Box::new(lhs), Box::new(rhs));
-                }
-
                 _ => return lhs,
             }
         }
