@@ -22,14 +22,12 @@ PRD.3.1.50: The edit page must include a submit and cancel button.
 PRD.3.1.51: The edit page must have a "published" checkbox.  The checkbox is not checked for new entities.
 PRD.3.1.60: U4 must reject edit submissions that don't make sense.  The same edit page is redisplayed with an error.
 PRD.3.1.60.1: any submission without a name/title.  This field is used for blog/wiki linking.
-PRD.3.1.60.2: any submission without an abstract, body, or body file.  An empty article is just a waste of resources.
-PRD.3.1.60.3: any submission with either an abstract or body *and* a body file.
+PRD.3.1.60.2: any submission missing an abstract, body, and body file.  An empty article is just a waste of resources.
+PRD.3.1.60.3: any submission with a body text *and* a body file.
 PRD.3.1.60.4: any submission with a name/title that doesn't conform to Wiki syntax guidelines.
-PRD.3.1.80: U4 must accept edit submissions with *either* text area *or* body file upload populated.  The result is a preview page.
-PRD.3.1.90: Preview pages include the article number for the entity uploaded in the URL.
+PRD.3.1.90: Edits which are accepted results in a preview page, which include the article number for the entity in the URL.
 PRD.3.1.91: Preview pages *may* be the same as a pre-filled edit page, as long as a rendered preview appears on the same page.
-PRD.3.1.92: When showing a preview page, the URL must include the article number (e.g., redirect to http://.../articles/{n} or .../edit/{n}).
-PRD.3.1.100: If the user presses the cancel button, they are redirected to the home page.
+PRD.3.1.100: While viewing the edit or preview page, if the user presses the cancel button, they are redirected to the home page.
 
 PRD.4: Operation, Reader
 PRD.4.1: Reading Index Page
