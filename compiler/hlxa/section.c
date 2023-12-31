@@ -14,11 +14,19 @@ static section_t section_init(section_t);
 struct section_desc {
 	uint8_t *buffer;
 	size_t length;
+	size_t capacity;
 };
 
 section_t
 section_new(void) {
 	return section_init(section_alloc());
+}
+
+section_t
+section_new_from_string(char *s) {
+	section_t sect = section_new();
+	section_append_string(sect, s);
+	return sect;
 }
 
 void
@@ -37,6 +45,7 @@ section_guarantee_buffer(section_t s) {
 	if(s && !s->buffer) {
 		s->buffer = (uint8_t *)malloc(DEFAULT_SECTION_CAPACITY);
 		s->length = 0;
+		s->capacity = DEFAULT_SECTION_CAPACITY;
 	}
 }
 
@@ -50,9 +59,11 @@ section_guarantee_buffer(section_t s) {
 void
 section_append_byte(section_t s, uint8_t byte) {
 	section_guarantee_buffer(s);
-	if(s->buffer) {
-		s->buffer[s->length] = byte;
-		++ s->length;
+	if(s->length < s->capacity) {
+		if(s->buffer) {
+			s->buffer[s->length] = byte;
+			++ s->length;
+		}
 	}
 	// How to handle out-of-memory case here?
 }
@@ -101,5 +112,13 @@ section_init(section_t s) {
 		memset(s, 0, sizeof(struct section_desc));
 	}
 	return s;
+}
+
+void
+section_append_string(section_t s, char *str) {
+	// Slow, but correct.
+	while(*str) {
+		section_append_byte(s, (int)*str++);
+	}
 }
 

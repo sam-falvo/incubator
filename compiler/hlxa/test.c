@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "slice.h"
 #include "section.h"
+#include "statement.h"
 #include "hlxa.h"
 
 void
@@ -224,9 +226,57 @@ bail:
 }
 
 
+void
+test_hlxa_decode_01(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("hlxa_decode,XXXyyyzzz  XXXX  01234567,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	// XXXyyyzzz  XXXX  01234567
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = 0
+	// label stop = 9
+	// mnem start = 11
+	// mnem stop = 15
+	// oper start = 17
+	// oper stop = 25
+
+	statement_sect = section_new_from_string("XXXyyyzzz  XXXX  01234567");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), 0, 9)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), 11, 15)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), 17, 25)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
 int
 main(int argc, char *argv[]) {
 	print_table_header();
+
+	test_hlxa_decode_01();
 
 	test_hlxa_assemble_line_01();
 	test_hlxa_assemble_line_02();
