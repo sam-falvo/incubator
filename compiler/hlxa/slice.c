@@ -19,6 +19,7 @@ slice_range_eq(slice_t s, int start, int end) {
 
 bool
 slice_range_ne(slice_t s, int start, int end) {
+	if(!s) return false;
 	return !slice_range_eq(s, start, end);
 }
 
