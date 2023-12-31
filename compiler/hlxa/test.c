@@ -15,18 +15,24 @@ main(int argc, char *argv[]) {
 	section_t expected;
 	section_t actual;
 	hlxa_t hlxa;
-	bool equal;
+	bool equal = false;
 
 	expected = section_new();
+	if(!expected) goto bail;
 	section_append_byte(expected, 0x01);
 
 	actual = section_new();
-	hlxa = hlxa_new();
-	hlxa_set_section(hlxa, actual);
+	if(!actual) goto bail;
 
+	hlxa = hlxa_new();
+	if(!hlxa) goto bail;
+
+	hlxa_set_section(hlxa, actual);
 	hlxa_assemble_line(hlxa, "X'01'");
 
   equal = section_compare_eq(expected, actual);
+
+bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
