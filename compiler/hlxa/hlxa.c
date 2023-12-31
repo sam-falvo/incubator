@@ -10,6 +10,7 @@ static hlxa_t hlxa_alloc(void);
 static hlxa_t hlxa_init(hlxa_t);
 
 struct hlxa_desc {
+	section_t current_section;   // Section into which we're currently assembling
 };
 
 static hlxa_t
@@ -38,10 +39,14 @@ hlxa_free(hlxa_t *pa) {
 	}
 }
 
+// Sets the section into which the assembler is generating code.
 void
 hlxa_set_section(hlxa_t a, section_t s) {
+	a->current_section = s;
 }
 
+// Attempts to assemble a single source line.
 void
 hlxa_assemble_line(hlxa_t a, char *linebuf) {
+	section_append_byte(a->current_section, 0x01);
 }
