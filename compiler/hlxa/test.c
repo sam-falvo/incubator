@@ -227,12 +227,12 @@ bail:
 
 
 void
-test_hlxa_decode_01(void) {
+test_statement_decode_01(void) {
 	bool passed = false;
 	section_t statement_sect;
 	statement_t statement;
 
-	printf("hlxa_decode,XXXyyyzzz  XXXX  01234567,");
+	printf("statement_decode,XXXyyyzzz  XXXX  01234567,");
 
 	// Given an assembly listing input of:
 	//
@@ -272,11 +272,246 @@ bail:
 }
 
 
+void
+test_statement_decode_02(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("statement_decode,           XXXX  01234567,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	//            XXXX  01234567
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = -1
+	// label stop = -1
+	// mnem start = 11
+	// mnem stop = 15
+	// oper start = 17
+	// oper stop = 25
+
+	statement_sect = section_new_from_string("           XXXX  01234567");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), -1, -1)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), 11, 15)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), 17, 25)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_statement_decode_03(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("statement_decode,XXXyyyzzz  XXXX          ,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	// XXXyyyzzz  XXXX
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = 0
+	// label stop = 9
+	// mnem start = 11
+	// mnem stop = 15
+	// oper start = -1
+	// oper stop = -1
+
+	statement_sect = section_new_from_string("XXXyyyzzz  XXXX          ");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), 0, 9)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), 11, 15)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), -1, -1)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_statement_decode_04(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("statement_decode,           XXXX          ,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	//            XXXX
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = -1
+	// label stop = -1
+	// mnem start = 11
+	// mnem stop = 15
+	// oper start = -1
+	// oper stop = -1
+
+	statement_sect = section_new_from_string("           XXXX          ");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), -1, -1)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), 11, 15)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), -1, -1)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_statement_decode_05(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("statement_decode,XXXyyyzzz                ,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	// XXXyyyzzz
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = 0
+	// label stop = 9
+	// mnem start = -1
+	// mnem stop = -1
+	// oper start = -1
+	// oper stop = -1
+
+	statement_sect = section_new_from_string("XXXyyyzzz                ");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), 0, 9)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), -1, -1)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), -1, -1)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_statement_decode_06(void) {
+	bool passed = false;
+	section_t statement_sect;
+	statement_t statement;
+
+	printf("statement_decode,                         ,");
+
+	// Given an assembly listing input of:
+	//
+	//           1    1    2    2
+	// 0....5....0....5....0....5....
+	//
+	// (blank line)
+	//
+	// We expect the various field slices to match as follows:
+	//
+	// label start = -1
+	// label stop = -1
+	// mnem start = -1
+	// mnem stop = -1
+	// oper start = -1
+	// oper stop = -1
+
+	statement_sect = section_new_from_string("                         ");
+  statement = statement_new();
+	if(!statement) goto bail;
+	statement_decode(statement_sect, statement);
+
+	if(statement_errors(statement)) goto bail;
+
+	if(slice_range_ne(statement_borrow_label(statement), -1, -1)) goto bail;
+	if(slice_range_ne(statement_borrow_mnemonic(statement), -1, -1)) goto bail;
+	if(slice_range_ne(statement_borrow_operand(statement), -1, -1)) goto bail;
+
+	passed = true;
+
+bail:
+	statement_free(&statement);
+	section_free(&statement_sect);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
 int
 main(int argc, char *argv[]) {
 	print_table_header();
 
-	test_hlxa_decode_01();
+	test_statement_decode_01();
+	test_statement_decode_02();
+	test_statement_decode_03();
+	test_statement_decode_04();
+	test_statement_decode_05();
+	test_statement_decode_06();
 
 	test_hlxa_assemble_line_01();
 	test_hlxa_assemble_line_02();
