@@ -122,3 +122,16 @@ section_append_string(section_t s, char *str) {
 	}
 }
 
+int
+section_byte_at(section_t s, int at) {
+	if(at < s->length) {
+		return s->buffer[at];
+	}
+
+	return -1;
+}
+
+size_t
+section_length(section_t s) {
+	return s->length;
+}
