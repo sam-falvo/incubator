@@ -45,8 +45,49 @@ hlxa_set_section(hlxa_t a, section_t s) {
 	a->current_section = s;
 }
 
+// Convert a hex value into a binary value
+static int
+hex_value(char ch) {
+	int i = ch;
+
+	// Assume ASCII.
+	i -= 0x30;
+	if(i > 0x09) { // it was either an A-F or a-f
+		i -= 7;
+		if(i > 0x0F) { // it was a lowercase a-f
+			i -= 0x20;
+		}
+	}
+	return i;
+}
+
+// answers true iff the digit is a hexadecimal digit
+static bool
+is_hexdigit(char ch) {
+	return (
+			((ch >= '0') && (ch <= '9')) ||
+			((ch >= 'A') && (ch <= 'F')) ||
+			((ch >= 'a') && (ch <= 'f'))
+	);
+}
+
 // Attempts to assemble a single source line.
 void
 hlxa_assemble_line(hlxa_t a, char *linebuf) {
-	section_append_byte(a->current_section, 0x01);
+	char *p = linebuf + 2; // skip over initial X'
+	int byte = 0;
+
+	// Accumulate a byte
+	while(is_hexdigit(*p)) {
+		byte = (byte << 4) | hex_value(*p);
+		++ p;
+
+		if(is_hexdigit(*p)) {
+			byte = (byte << 4) | hex_value(*p);
+			++ p;
+		}
+
+		section_append_byte(a->current_section, byte);
+		byte = 0;
+	}
 }
