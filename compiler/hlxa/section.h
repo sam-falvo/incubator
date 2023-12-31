@@ -13,4 +13,7 @@ bool      section_compare_eq(section_t, section_t);
 void      section_append_string(section_t, char *);
 int       section_byte_at(section_t, int);
 size_t    section_length(section_t);
+bool      section_memcmp_eq(section_t, int, uint8_t *, size_t);
+bool      section_memcmp_ne(section_t, int, uint8_t *, size_t);
 
+char *    section_byte_address_fixme(section_t, int);

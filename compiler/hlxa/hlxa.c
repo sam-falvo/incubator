@@ -11,6 +11,7 @@ static hlxa_t hlxa_init(hlxa_t);
 
 struct hlxa_desc {
 	section_t current_section;   // Section into which we're currently assembling
+	int       errors;
 };
 
 static hlxa_t
@@ -90,4 +91,26 @@ hlxa_assemble_line(hlxa_t a, char *linebuf) {
 		section_append_byte(a->current_section, byte);
 		byte = 0;
 	}
+}
+
+// Attempts to assemble a single source line.
+void
+hlxa_assemble_statement(hlxa_t a, section_t sect, statement_t s) {
+	if(slice_length(statement_borrow_operand(s)) == 0) {
+		a->errors |= ERRF_MISSING_OPERAND;
+		return;
+	}
+
+	if(slice_string_ne(statement_borrow_mnemonic(s), sect, "DC")) {
+		a->errors |= ERRF_UNKNOWN_MNEMONIC;
+		return;
+	}
+
+	hlxa_assemble_line(a, section_byte_address_fixme(sect, statement_borrow_operand(s)->start));
+}
+
+// Answers with the current set of errors.
+int
+hlxa_errors(hlxa_t a) {
+	return a->errors;
 }

@@ -135,3 +135,29 @@ size_t
 section_length(section_t s) {
 	return s->length;
 }
+
+bool
+section_memcmp_eq(section_t s, int start, uint8_t *buf, size_t length) {
+	int end = start + length;
+
+	if(start >= s->length) return false;
+	if(end   >  s->length) return false;
+
+	return 0 == memcmp(&s->buffer[start], buf, length);
+}
+
+bool
+section_memcmp_ne(section_t s, int start, uint8_t *buf, size_t length) {
+	int end = start + length;
+
+	if(start >= s->length) return false;
+	if(end   >  s->length) return false;
+
+	return 0 != memcmp(&s->buffer[start], buf, length);
+}
+
+char *
+section_byte_address_fixme(section_t s, int start) {
+	return (char *)&s->buffer[start];
+}
+
