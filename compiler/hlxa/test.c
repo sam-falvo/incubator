@@ -82,10 +82,48 @@ bail:
 }
 
 
+void
+test_hlxa_assemble_line_03(void) {
+	section_t expected;
+	section_t actual;
+	hlxa_t hlxa;
+	bool equal = false;
+
+	printf("hlxa_assemble_line,DC parameter X'01234567',");
+
+	expected = section_new();
+	if(!expected) goto bail;
+	section_append_byte(expected, 0x01);
+	section_append_byte(expected, 0x23);
+	section_append_byte(expected, 0x45);
+	section_append_byte(expected, 0x67);
+
+	actual = section_new();
+	if(!actual) goto bail;
+
+	hlxa = hlxa_new();
+	if(!hlxa) goto bail;
+
+	hlxa_set_section(hlxa, actual);
+	hlxa_assemble_line(hlxa, "X'01234567'");
+
+  equal = section_compare_eq(expected, actual);
+
+bail:
+	hlxa_free(&hlxa);
+	section_free(&actual);
+	section_free(&expected);
+
+	if(equal)  printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
 int
 main(int argc, char *argv[]) {
 	print_table_header();
 
 	test_hlxa_assemble_line_01();
 	test_hlxa_assemble_line_02();
+	test_hlxa_assemble_line_03();
 }
