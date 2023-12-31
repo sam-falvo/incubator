@@ -29,6 +29,7 @@ test_hlxa_assemble_statement_01(void) {
 	statement = statement_new();
 	input_section = section_new_from_string("  DC X'01'");
 	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
 
 	expected = section_new();
 	if(!expected) goto bail;
@@ -60,13 +61,20 @@ bail:
 
 
 void
-test_hlxa_assemble_line_02(void) {
-	section_t expected;
-	section_t actual;
-	hlxa_t hlxa;
+test_hlxa_assemble_statement_02(void) {
 	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
 
 	printf("hlxa_assemble_line,DC X'0123',");
+
+	statement = statement_new();
+	input_section = section_new_from_string("  DC X'0123'");
+	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
 
 	expected = section_new();
 	if(!expected) goto bail;
@@ -80,7 +88,9 @@ test_hlxa_assemble_line_02(void) {
 	if(!hlxa) goto bail;
 
 	hlxa_set_section(hlxa, actual);
-	hlxa_assemble_line(hlxa, "X'0123'");
+	hlxa_assemble_statement(hlxa, input_section, statement);
+
+	if(hlxa_errors(hlxa)) goto bail;
 
   equal = section_compare_eq(expected, actual);
 
@@ -88,6 +98,8 @@ bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
 
 	if(equal)  printf("PASS\n");
 	else       printf("FAIL\n");
@@ -95,13 +107,20 @@ bail:
 
 
 void
-test_hlxa_assemble_line_03(void) {
-	section_t expected;
-	section_t actual;
-	hlxa_t hlxa;
+test_hlxa_assemble_statement_03(void) {
 	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
 
 	printf("hlxa_assemble_line,DC X'01234567',");
+
+	statement = statement_new();
+	input_section = section_new_from_string("  DC X'01234567'");
+	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
 
 	expected = section_new();
 	if(!expected) goto bail;
@@ -117,7 +136,7 @@ test_hlxa_assemble_line_03(void) {
 	if(!hlxa) goto bail;
 
 	hlxa_set_section(hlxa, actual);
-	hlxa_assemble_line(hlxa, "X'01234567'");
+	hlxa_assemble_statement(hlxa, input_section, statement);
 
   equal = section_compare_eq(expected, actual);
 
@@ -125,6 +144,8 @@ bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
 
 	if(equal)  printf("PASS\n");
 	else       printf("FAIL\n");
@@ -132,14 +153,21 @@ bail:
 
 
 void
-test_hlxa_assemble_line_04(void) {
-	section_t expected;
-	section_t actual;
-	hlxa_t hlxa;
+test_hlxa_assemble_statement_04(void) {
 	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
 
 	printf("hlxa_assemble_line,DC X'0123456',");
 
+	statement = statement_new();
+	input_section = section_new_from_string("  DC X'0123456'");
+	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
+
 	expected = section_new();
 	if(!expected) goto bail;
 
@@ -150,16 +178,19 @@ test_hlxa_assemble_line_04(void) {
 	if(!hlxa) goto bail;
 
 	hlxa_set_section(hlxa, actual);
-	hlxa_assemble_line(hlxa, "X'0123456'");
+	hlxa_assemble_statement(hlxa, input_section, statement);
+	if(!hlxa_errors(hlxa)) goto bail;
+
 	// The above is a syntax error; so we expect an
 	// empty section due to an error.
-
   equal = section_compare_eq(expected, actual);
 
 bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
 
 	if(equal)  printf("PASS\n");
 	else       printf("FAIL\n");
@@ -167,14 +198,21 @@ bail:
 
 
 void
-test_hlxa_assemble_line_05(void) {
-	section_t expected;
-	section_t actual;
-	hlxa_t hlxa;
+test_hlxa_assemble_statement_05(void) {
 	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
 
 	printf("hlxa_assemble_line,DC '01234567',");
 
+	statement = statement_new();
+	input_section = section_new_from_string("  DC '01234567'");
+	statement_decode(input_section, statement);
+  if(statement_errors(statement)) goto bail;
+
 	expected = section_new();
 	if(!expected) goto bail;
 
@@ -185,16 +223,19 @@ test_hlxa_assemble_line_05(void) {
 	if(!hlxa) goto bail;
 
 	hlxa_set_section(hlxa, actual);
-	hlxa_assemble_line(hlxa, "'01234567'");
+	hlxa_assemble_statement(hlxa, input_section, statement);
+	if(!hlxa_errors(hlxa)) goto bail;
+
 	// The above is a syntax error; so we expect an
 	// empty section due to an error.
-
   equal = section_compare_eq(expected, actual);
 
 bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
 
 	if(equal)  printf("PASS\n");
 	else       printf("FAIL\n");
@@ -202,13 +243,20 @@ bail:
 
 
 void
-test_hlxa_assemble_line_06(void) {
-	section_t expected;
-	section_t actual;
-	hlxa_t hlxa;
+test_hlxa_assemble_statement_06(void) {
 	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
 
 	printf("hlxa_assemble_line,DC X'01234567\\\",");
+
+	statement = statement_new();
+	input_section = section_new_from_string("  DC X'01234567\"");
+	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
 
 	expected = section_new();
 	if(!expected) goto bail;
@@ -220,16 +268,19 @@ test_hlxa_assemble_line_06(void) {
 	if(!hlxa) goto bail;
 
 	hlxa_set_section(hlxa, actual);
-	hlxa_assemble_line(hlxa, "X'01234567\"");
+	hlxa_assemble_statement(hlxa, input_section, statement);
+	if(!hlxa_errors(hlxa)) goto bail;
+
 	// The above is a syntax error; so we expect an
 	// empty section due to an error.
-
   equal = section_compare_eq(expected, actual);
 
 bail:
 	hlxa_free(&hlxa);
 	section_free(&actual);
 	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
 
 	if(equal)  printf("PASS\n");
 	else       printf("FAIL\n");
@@ -524,9 +575,9 @@ main(int argc, char *argv[]) {
 	test_statement_decode_06();
 
 	test_hlxa_assemble_statement_01();
-	test_hlxa_assemble_line_02();
-	test_hlxa_assemble_line_03();
-	test_hlxa_assemble_line_04();
-	test_hlxa_assemble_line_05();
-	test_hlxa_assemble_line_06();
+	test_hlxa_assemble_statement_02();
+	test_hlxa_assemble_statement_03();
+	test_hlxa_assemble_statement_04();
+	test_hlxa_assemble_statement_05();
+	test_hlxa_assemble_statement_06();
 }

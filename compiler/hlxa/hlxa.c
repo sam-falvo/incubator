@@ -74,9 +74,25 @@ is_hexdigit(char ch) {
 
 // Attempts to assemble a single source line.
 void
-hlxa_assemble_line(hlxa_t a, char *linebuf) {
-	char *p = linebuf + 2; // skip over initial X'
+hlxa_assemble_statement(hlxa_t a, section_t sect, statement_t s) {
+	char *linebuf, *p;
 	int byte = 0;
+	slice_t operand_slice = statement_borrow_operand(s);
+
+	if(slice_length(operand_slice) == 0) {
+		a->errors |= ERRF_MISSING_OPERAND;
+		return;
+	}
+
+	if(slice_string_ne(statement_borrow_mnemonic(s), sect, "DC")) {
+		a->errors |= ERRF_UNKNOWN_MNEMONIC;
+		return;
+	}
+
+	// The remaining code should belong in a Reader abstraction of some kind.
+
+	linebuf = section_byte_address_fixme(sect, operand_slice->start);
+	p = linebuf + 2; // skip over initial X'
 
 	// Accumulate a byte
 	while(is_hexdigit(*p)) {
@@ -91,22 +107,6 @@ hlxa_assemble_line(hlxa_t a, char *linebuf) {
 		section_append_byte(a->current_section, byte);
 		byte = 0;
 	}
-}
-
-// Attempts to assemble a single source line.
-void
-hlxa_assemble_statement(hlxa_t a, section_t sect, statement_t s) {
-	if(slice_length(statement_borrow_operand(s)) == 0) {
-		a->errors |= ERRF_MISSING_OPERAND;
-		return;
-	}
-
-	if(slice_string_ne(statement_borrow_mnemonic(s), sect, "DC")) {
-		a->errors |= ERRF_UNKNOWN_MNEMONIC;
-		return;
-	}
-
-	hlxa_assemble_line(a, section_byte_address_fixme(sect, statement_borrow_operand(s)->start));
 }
 
 // Answers with the current set of errors.
