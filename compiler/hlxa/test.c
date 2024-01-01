@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "dc_context.h"
 #include "reader.h"
 #include "slice.h"
 #include "section.h"
@@ -576,7 +577,7 @@ test_reader_01(void) {
 
 	input_section = section_new_from_string("128X'20'");
 	if(!input_section) goto bail;
-  slice_init_with_bounds(&input_slice, 0, 3);
+	slice_init_with_bounds(&input_slice, 0, 3);
 
 	reader_init(&reader, &input_slice, input_section);
 
@@ -621,7 +622,7 @@ test_reader_02a(void) {
 
 	input_section = section_new_from_string("128X'20'");
 	if(!input_section) goto bail;
-  slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
 	reader_init(&reader, &input_slice, input_section);
 
 	ch = reader_read_integer(&reader);
@@ -652,7 +653,7 @@ test_reader_02b(void) {
 
 	input_section = section_new_from_string("128");
 	if(!input_section) goto bail;
-  slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
 	reader_init(&reader, &input_slice, input_section);
 
 	ch = reader_read_integer(&reader);
@@ -660,6 +661,71 @@ test_reader_02b(void) {
 
 	ch = reader_peek_char(&reader);
 	if(ch != -1) goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_reader_03(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct reader_desc reader;
+	int ch;
+	struct slice_desc result_slice;
+
+	printf("reader,subslice string ',");
+
+	input_section = section_new_from_string("'128'");
+	if(!input_section) goto bail;
+	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+	reader_init(&reader, &input_slice, input_section);
+
+	reader_subslice_string(&reader, &result_slice);
+	if(result_slice.start != 1) goto bail;
+	if(result_slice.end != 4) goto bail;
+
+	ch = reader_peek_char(&reader);
+	if(ch != -1) goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_dc_context_decode_01(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct dc_context_desc context;
+
+	printf("dc_context_decode,X'11',");
+
+	input_section = section_new_from_string("X'11'");
+	if(!input_section) goto bail;
+	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+
+	dc_context_decode(&input_slice, input_section, &context);
+
+	if(context.duplication != 1) goto bail;
+	if(context.type_ != 'X') goto bail;
+	if(context.subtype != ' ') goto bail;
+	if(context.length != -1) goto bail;
+	if(context.quote != '\'') goto bail;
+	if(context.errors != 0) goto bail;
 
 	passed = true;
 
@@ -692,4 +758,7 @@ main(int argc, char *argv[]) {
 	test_reader_01();
 	test_reader_02a();
 	test_reader_02b();
+	test_reader_03();
+
+	test_dc_context_decode_01();
 }
