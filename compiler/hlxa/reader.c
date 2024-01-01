@@ -1,3 +1,5 @@
+#include <ctype.h>
+
 #include "reader.h"
 
 
@@ -24,4 +26,20 @@ reader_peek_char(reader_t rd) {
 void
 reader_next_char(reader_t rd) {
 	if(rd->index < rd->slice->end)  ++ rd->index;
+}
+
+
+int
+reader_read_integer(reader_t rd) {
+	int value = 0;
+	int ch;
+
+	ch = reader_peek_char(rd);
+	while(isdigit(ch)) {
+		value = value * 10 + (ch - '0');
+		reader_next_char(rd);
+		ch = reader_peek_char(rd);
+	}
+
+	return value;
 }

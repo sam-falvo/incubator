@@ -609,6 +609,68 @@ bail:
 }
 
 
+void
+test_reader_02a(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct reader_desc reader;
+	int ch;
+
+	printf("reader,read integer (128X),");
+
+	input_section = section_new_from_string("128X'20'");
+	if(!input_section) goto bail;
+  slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+	reader_init(&reader, &input_slice, input_section);
+
+	ch = reader_read_integer(&reader);
+	if(ch != 128) goto bail;
+
+	ch = reader_peek_char(&reader);
+	if(ch != 'X') goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_reader_02b(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct reader_desc reader;
+	int ch;
+
+	printf("reader,read integer (128<EOF>),");
+
+	input_section = section_new_from_string("128");
+	if(!input_section) goto bail;
+  slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+	reader_init(&reader, &input_slice, input_section);
+
+	ch = reader_read_integer(&reader);
+	if(ch != 128) goto bail;
+
+	ch = reader_peek_char(&reader);
+	if(ch != -1) goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
 int
 main(int argc, char *argv[]) {
 	print_table_header();
@@ -628,4 +690,6 @@ main(int argc, char *argv[]) {
 	test_hlxa_assemble_statement_06();
 
 	test_reader_01();
+	test_reader_02a();
+	test_reader_02b();
 }
