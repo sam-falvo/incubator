@@ -2,9 +2,11 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "section.h"
 #include "hlxa.h"
+#include "dc_context.h"
 
 static hlxa_t hlxa_alloc(void);
 static hlxa_t hlxa_init(hlxa_t);
@@ -64,13 +66,15 @@ hex_value(char ch) {
 
 // answers true iff the digit is a hexadecimal digit
 static bool
-is_hexdigit(char ch) {
+is_hexdigit(uint8_t ch) {
 	return (
-			((ch >= '0') && (ch <= '9')) ||
-			((ch >= 'A') && (ch <= 'F')) ||
-			((ch >= 'a') && (ch <= 'f'))
+		((ch >= '0') && (ch <= '9')) ||
+		((ch >= 'A') && (ch <= 'F')) ||
+		((ch >= 'a') && (ch <= 'f'))
 	);
 }
+
+#ifdef OLD
 
 // Attempts to assemble a single source line.
 void
@@ -108,6 +112,42 @@ hlxa_assemble_statement(hlxa_t a, section_t sect, statement_t s) {
 		byte = 0;
 	}
 }
+
+#else // ==============================================================
+
+// Attempts to assemble a single source line.
+void
+hlxa_assemble_statement(hlxa_t a, section_t inp, statement_t s) {
+	slice_t operand_slice = statement_borrow_operand(s);
+	struct dc_context_desc context;
+
+	// Currently, we only recognize the DC mnemonic.
+
+	if(slice_string_ne(statement_borrow_mnemonic(s), inp, "DC")) {
+		a->errors |= ERRF_UNKNOWN_MNEMONIC;
+		return;
+	}
+
+	// DC must have at least one operand.
+
+	if(slice_length(operand_slice) == 0) {
+		a->errors |= ERRF_MISSING_OPERAND;
+		return;
+	}
+
+	dc_context_init(&context);
+	dc_context_decode(operand_slice, inp, &context);
+	dc_context_validate(&context, inp);
+	if(dc_context_errors(&context)) {
+		// How to log specific context errors?
+		a->errors |= ERRF_BAD_OPERAND;
+		return;
+	}
+
+	// If here, context is valid; assemble the bytes into the current section.
+}
+
+#endif
 
 // Answers with the current set of errors.
 int

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "reader.h"
 #include "slice.h"
 #include "section.h"
 #include "statement.h"
@@ -69,7 +70,7 @@ test_hlxa_assemble_statement_02(void) {
 	section_t input_section;
 	statement_t statement;
 
-	printf("hlxa_assemble_line,DC X'0123',");
+	printf("hlxa_assemble_statement,DC X'0123',");
 
 	statement = statement_new();
 	input_section = section_new_from_string("  DC X'0123'");
@@ -115,7 +116,7 @@ test_hlxa_assemble_statement_03(void) {
 	section_t input_section;
 	statement_t statement;
 
-	printf("hlxa_assemble_line,DC X'01234567',");
+	printf("hlxa_assemble_statement,DC X'01234567',");
 
 	statement = statement_new();
 	input_section = section_new_from_string("  DC X'01234567'");
@@ -161,7 +162,7 @@ test_hlxa_assemble_statement_04(void) {
 	section_t input_section;
 	statement_t statement;
 
-	printf("hlxa_assemble_line,DC X'0123456',");
+	printf("hlxa_assemble_statement,DC X'0123456',");
 
 	statement = statement_new();
 	input_section = section_new_from_string("  DC X'0123456'");
@@ -206,7 +207,7 @@ test_hlxa_assemble_statement_05(void) {
 	section_t input_section;
 	statement_t statement;
 
-	printf("hlxa_assemble_line,DC '01234567',");
+	printf("hlxa_assemble_statement,DC '01234567',");
 
 	statement = statement_new();
 	input_section = section_new_from_string("  DC '01234567'");
@@ -251,7 +252,7 @@ test_hlxa_assemble_statement_06(void) {
 	section_t input_section;
 	statement_t statement;
 
-	printf("hlxa_assemble_line,DC X'01234567\\\",");
+	printf("hlxa_assemble_statement,DC X'01234567\\\",");
 
 	statement = statement_new();
 	input_section = section_new_from_string("  DC X'01234567\"");
@@ -563,6 +564,51 @@ bail:
 }
 
 
+void
+test_reader_01(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct reader_desc reader;
+	int ch;
+
+	printf("reader,character peek,");
+
+	input_section = section_new_from_string("128X'20'");
+	if(!input_section) goto bail;
+  slice_init_with_bounds(&input_slice, 0, 3);
+
+	reader_init(&reader, &input_slice, input_section);
+
+	ch = reader_peek_char(&reader);
+	if(ch != '1') goto bail;
+  reader_next_char(&reader);
+
+	ch = reader_peek_char(&reader);
+	if(ch != '2') goto bail;
+  reader_next_char(&reader);
+
+	ch = reader_peek_char(&reader);
+	if(ch != '8') goto bail;
+  reader_next_char(&reader);
+
+	ch = reader_peek_char(&reader);
+	if(ch != -1) goto bail;
+  reader_next_char(&reader);
+
+	ch = reader_peek_char(&reader);
+	if(ch != -1) goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
 int
 main(int argc, char *argv[]) {
 	print_table_header();
@@ -580,4 +626,6 @@ main(int argc, char *argv[]) {
 	test_hlxa_assemble_statement_04();
 	test_hlxa_assemble_statement_05();
 	test_hlxa_assemble_statement_06();
+
+	test_reader_01();
 }

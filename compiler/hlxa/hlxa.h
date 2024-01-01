@@ -6,6 +6,7 @@ typedef struct hlxa_desc *hlxa_t;
 
 #define ERRF_MISSING_OPERAND   0x0001
 #define ERRF_UNKNOWN_MNEMONIC  0x0002
+#define ERRF_BAD_OPERAND       0x0004
 
 hlxa_t hlxa_new(void);
 void   hlxa_free(hlxa_t *);
