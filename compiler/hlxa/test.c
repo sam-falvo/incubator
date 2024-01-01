@@ -693,7 +693,7 @@ test_reader_03(void) {
 	if(result_slice.end != 4) goto bail;
 
 	ch = reader_peek_char(&reader);
-	if(ch != -1) goto bail;
+	if(ch != '\'') goto bail;
 
 	passed = true;
 
@@ -719,12 +719,42 @@ test_dc_context_decode_01(void) {
 	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
 
 	dc_context_decode(&input_slice, input_section, &context);
-
 	if(context.duplication != 1) goto bail;
 	if(context.type_ != 'X') goto bail;
 	if(context.subtype != ' ') goto bail;
 	if(context.length != -1) goto bail;
 	if(context.quote != '\'') goto bail;
+	if(context.errors != 0) goto bail;
+
+	passed = true;
+
+bail:
+	section_free(&input_section);
+
+	if(passed) printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
+test_dc_context_decode_02(void) {
+	bool passed = false;
+	section_t input_section;
+	struct slice_desc input_slice;
+	struct dc_context_desc context;
+
+	printf("dc_context_decode,128XRL256\"AA55\",");
+
+	input_section = section_new_from_string("128XRL256\"AA55\"");
+	if(!input_section) goto bail;
+	slice_init_with_bounds(&input_slice, 0, section_length(input_section));
+
+	dc_context_decode(&input_slice, input_section, &context);
+	if(context.duplication != 128) goto bail;
+	if(context.type_ != 'X') goto bail;
+	if(context.subtype != 'R') goto bail;
+	if(context.length != 256) goto bail;
+	if(context.quote != '\"') goto bail;
 	if(context.errors != 0) goto bail;
 
 	passed = true;
@@ -761,4 +791,5 @@ main(int argc, char *argv[]) {
 	test_reader_03();
 
 	test_dc_context_decode_01();
+	test_dc_context_decode_02();
 }

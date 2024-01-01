@@ -1,5 +1,7 @@
 #include <stdint.h>
+#include <ctype.h>
 
+#include "reader.h"
 #include "dc_context.h"
 
 dc_context_t
@@ -85,6 +87,64 @@ dc_context_errors(dc_context_t ctx) {
 
 void
 dc_context_decode(slice_t s, section_t inp, dc_context_t ctx) {
-	// does nothing for now
+	struct reader_desc reader;
+	int ch, closing_quote;
+
+	dc_context_init(ctx);
+	reader_init(&reader, s, inp);
+
+	// Process duplication if present
+
+	ch = reader_peek_char(&reader);
+	if(isdigit(ch)) {
+		ctx->duplication = reader_read_integer(&reader);
+	}
+
+	// Process type
+
+	ctx->type_ = reader_peek_char(&reader);
+	reader_next_char(&reader);
+
+	// IF the next character alphabetic and is not P and not L, then it is a subtype.
+
+	ch = reader_peek_char(&reader);
+	if(isalpha(ch) && (ch != 'P') && (ch != 'L')) {
+		ctx->subtype = ch;
+		
+		reader_next_char(&reader);
+		ch = reader_peek_char(&reader);
+	}
+
+	// If the P "program modifier" option is provided, we yield an error.
+	if(ch == 'P') {
+		ctx->errors |= DCCTX_ERRF_PGMMOD;
+
+		reader_next_char(&reader);
+		ch = reader_peek_char(&reader);
+	}
+
+	// If the L length modifier is provided, parse it out.
+	if(ch == 'L') {
+		reader_next_char(&reader);
+		ctx->length = reader_read_integer(&reader);
+		ch = reader_peek_char(&reader);
+	}
+
+	// The next character ought to be the quote for the nominal value field.
+	switch(ch) {
+	case '\'':
+	case '"':
+	case '`':
+		ctx->quote = ch;
+		reader_subslice_string(&reader, &ctx->value);
+		closing_quote = reader_peek_char(&reader);
+		if(closing_quote != ch) ctx->errors |= DCCTX_ERRF_CLOSE_QUOTE;
+		reader_next_char(&reader);
+		break;
+
+	default:
+		ctx->errors |= DCCTX_ERRF_QUOTE;
+		break;
+	}
 }
 

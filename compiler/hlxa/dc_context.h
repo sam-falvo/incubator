@@ -23,6 +23,7 @@ struct dc_context_desc {
 #define DCCTX_ERRF_QUOTE         0x0010
 #define DCCTX_ERRF_VALUE         0x0020
 #define DCCTX_ERRF_CLOSE_QUOTE   0x0040
+#define DCCTX_ERRF_PGMMOD        0x0080
 
 dc_context_t dc_context_init(dc_context_t ctx);
 void         dc_context_validate(dc_context_t ctx, section_t inp);

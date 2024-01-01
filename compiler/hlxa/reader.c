@@ -60,6 +60,4 @@ reader_subslice_string(reader_t rd, slice_t s) {
 		reader_next_char(rd);
 		ch = reader_peek_char(rd);
 	}
-	
-	if(ch == quote) reader_next_char(rd);
 }
