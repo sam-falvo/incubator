@@ -32,6 +32,7 @@ section_new_from_string(char *s) {
 void
 section_free(section_t *ps) {
 	if(ps && *ps) {
+		if((*ps)->buffer) free((*ps)->buffer);
 		free(*ps);
 		*ps = NULL;
 	}

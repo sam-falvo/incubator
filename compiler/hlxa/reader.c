@@ -61,3 +61,39 @@ reader_subslice_string(reader_t rd, slice_t s) {
 		ch = reader_peek_char(rd);
 	}
 }
+
+// Convert a hex value into a binary value
+static int
+hex_value(char ch) {
+	int i = ch;
+
+	// Assume ASCII.
+	i -= 0x30;
+	if(i > 0x09) { // it was either an A-F or a-f
+		i -= 7;
+		if(i > 0x0F) { // it was a lowercase a-f
+			i -= 0x20;
+		}
+	}
+	return i;
+}
+
+
+int
+reader_read_byte_hex(reader_t rd) {
+	int byte = 0, ch;
+
+	ch = reader_peek_char(rd);
+	if(isxdigit(ch)) {
+		byte = (byte << 4) | hex_value(ch);
+		reader_next_char(rd);
+
+		ch = reader_peek_char(rd);
+		if(isxdigit(ch)) {
+			byte = (byte << 4) | hex_value(ch);
+			reader_next_char(rd);
+		}
+	}
+
+	return byte;
+}

@@ -290,6 +290,55 @@ bail:
 
 
 void
+test_hlxa_assemble_statement_07(void) {
+	bool equal = false;
+	hlxa_t hlxa;
+	section_t actual;
+	section_t expected;
+	section_t input_section;
+	statement_t statement;
+
+	printf("hlxa_assemble_statement,DC 128X'01234567',");
+
+	statement = statement_new();
+	input_section = section_new_from_string("  DC 128X'01234567'");
+	statement_decode(input_section, statement);
+	if(statement_errors(statement)) goto bail;
+
+	expected = section_new();
+	if(!expected) goto bail;
+	for(int i = 0; i < 128; i++) {
+		section_append_byte(expected, 0x01);
+		section_append_byte(expected, 0x23);
+		section_append_byte(expected, 0x45);
+		section_append_byte(expected, 0x67);
+	}
+
+	actual = section_new();
+	if(!actual) goto bail;
+
+	hlxa = hlxa_new();
+	if(!hlxa) goto bail;
+
+	hlxa_set_section(hlxa, actual);
+	hlxa_assemble_statement(hlxa, input_section, statement);
+	if(hlxa_errors(hlxa)) goto bail;
+
+  equal = section_compare_eq(expected, actual);
+
+bail:
+	hlxa_free(&hlxa);
+	section_free(&actual);
+	section_free(&expected);
+	section_free(&input_section);
+	statement_free(&statement);
+
+	if(equal)  printf("PASS\n");
+	else       printf("FAIL\n");
+}
+
+
+void
 test_statement_decode_01(void) {
 	bool passed = false;
 	section_t statement_sect;
@@ -778,13 +827,6 @@ main(int argc, char *argv[]) {
 	test_statement_decode_05();
 	test_statement_decode_06();
 
-	test_hlxa_assemble_statement_01();
-	test_hlxa_assemble_statement_02();
-	test_hlxa_assemble_statement_03();
-	test_hlxa_assemble_statement_04();
-	test_hlxa_assemble_statement_05();
-	test_hlxa_assemble_statement_06();
-
 	test_reader_01();
 	test_reader_02a();
 	test_reader_02b();
@@ -792,4 +834,12 @@ main(int argc, char *argv[]) {
 
 	test_dc_context_decode_01();
 	test_dc_context_decode_02();
+
+	test_hlxa_assemble_statement_01();
+	test_hlxa_assemble_statement_02();
+	test_hlxa_assemble_statement_03();
+	test_hlxa_assemble_statement_04();
+	test_hlxa_assemble_statement_05();
+	test_hlxa_assemble_statement_06();
+	test_hlxa_assemble_statement_07();
 }

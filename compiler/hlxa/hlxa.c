@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+#include "reader.h"
 #include "section.h"
 #include "hlxa.h"
 #include "dc_context.h"
@@ -48,78 +49,13 @@ hlxa_set_section(hlxa_t a, section_t s) {
 	a->current_section = s;
 }
 
-// Convert a hex value into a binary value
-static int
-hex_value(char ch) {
-	int i = ch;
-
-	// Assume ASCII.
-	i -= 0x30;
-	if(i > 0x09) { // it was either an A-F or a-f
-		i -= 7;
-		if(i > 0x0F) { // it was a lowercase a-f
-			i -= 0x20;
-		}
-	}
-	return i;
-}
-
-// answers true iff the digit is a hexadecimal digit
-static bool
-is_hexdigit(uint8_t ch) {
-	return (
-		((ch >= '0') && (ch <= '9')) ||
-		((ch >= 'A') && (ch <= 'F')) ||
-		((ch >= 'a') && (ch <= 'f'))
-	);
-}
-
-#ifdef OLD
-
-// Attempts to assemble a single source line.
-void
-hlxa_assemble_statement(hlxa_t a, section_t sect, statement_t s) {
-	char *linebuf, *p;
-	int byte = 0;
-	slice_t operand_slice = statement_borrow_operand(s);
-
-	if(slice_length(operand_slice) == 0) {
-		a->errors |= ERRF_MISSING_OPERAND;
-		return;
-	}
-
-	if(slice_string_ne(statement_borrow_mnemonic(s), sect, "DC")) {
-		a->errors |= ERRF_UNKNOWN_MNEMONIC;
-		return;
-	}
-
-	// The remaining code should belong in a Reader abstraction of some kind.
-
-	linebuf = section_byte_address_fixme(sect, operand_slice->start);
-	p = linebuf + 2; // skip over initial X'
-
-	// Accumulate a byte
-	while(is_hexdigit(*p)) {
-		byte = (byte << 4) | hex_value(*p);
-		++ p;
-
-		if(is_hexdigit(*p)) {
-			byte = (byte << 4) | hex_value(*p);
-			++ p;
-		}
-
-		section_append_byte(a->current_section, byte);
-		byte = 0;
-	}
-}
-
-#else // ==============================================================
-
 // Attempts to assemble a single source line.
 void
 hlxa_assemble_statement(hlxa_t a, section_t inp, statement_t s) {
 	slice_t operand_slice = statement_borrow_operand(s);
 	struct dc_context_desc context;
+	int i, ch;
+	struct reader_desc arg_reader;
 
 	// Currently, we only recognize the DC mnemonic.
 
@@ -145,9 +81,24 @@ hlxa_assemble_statement(hlxa_t a, section_t inp, statement_t s) {
 	}
 
 	// If here, context is valid; assemble the bytes into the current section.
-}
+	//
+	// Right now, DC X does not support any subtypes.  I plan on supporting R
+	// in the future, but for now, keeping things very simple.
+	if(context.subtype != ' ') {
+		a->errors |= ERRF_BAD_OPERAND;
+		return;
+	}
 
-#endif
+	for(i = 0; i < context.duplication; i++) {
+		reader_init(&arg_reader, &context.value, inp);
+
+		ch = reader_peek_char(&arg_reader);
+		while(isxdigit(ch)) {
+			section_append_byte(a->current_section, reader_read_byte_hex(&arg_reader));
+			ch = reader_peek_char(&arg_reader);
+		}
+	}
+}
 
 // Answers with the current set of errors.
 int
