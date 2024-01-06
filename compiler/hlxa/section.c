@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "section.h"
 
@@ -160,5 +161,38 @@ section_memcmp_ne(section_t s, int start, uint8_t *buf, size_t length) {
 char *
 section_byte_address_fixme(section_t s, int start) {
 	return (char *)&s->buffer[start];
+}
+
+static void
+trim_trailing_whitespace(section_t s) {
+	size_t length = s->length;
+
+	while((length > 0) && isspace(s->buffer[length-1]))
+		--length;
+
+	s->length = length;
+	s->buffer[length] = 0;
+}
+
+bool
+section_refill_from_file(section_t s, FILE *fp) {
+	char *str;
+
+	section_guarantee_buffer(s);
+	str = fgets((char *)s->buffer, s->capacity, fp);
+	s->buffer[s->capacity - 1] = 0;
+	s->length = strlen((char *)s->buffer);
+	trim_trailing_whitespace(s);
+	return str != NULL;
+}
+
+void
+section_debug_print_buffer(FILE *fp, section_t s) {
+	fprintf(fp, "%s\n", s->buffer);
+}
+
+uint8_t *
+section_borrow_buffer(section_t s) {
+	return s->buffer;
 }
 

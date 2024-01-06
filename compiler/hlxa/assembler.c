@@ -57,6 +57,8 @@ assembler_assemble_statement(assembler_t a, section_t inp, statement_t s) {
 	int i, ch;
 	struct reader_desc arg_reader;
 
+	a->errors = 0;
+
 	// Currently, we only recognize the DC mnemonic.
 
 	if(slice_string_ne(statement_borrow_mnemonic(s), inp, "DC")) {
@@ -105,3 +107,9 @@ int
 assembler_errors(assembler_t a) {
 	return a->errors;
 }
+
+section_t
+assembler_get_section(assembler_t a) {
+	return a->current_section;
+}
+

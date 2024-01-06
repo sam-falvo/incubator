@@ -13,3 +13,4 @@ void        assembler_free(assembler_t *);
 void        assembler_set_section(assembler_t, section_t);
 void        assembler_assemble_statement(assembler_t, section_t, statement_t);
 int         assembler_errors(assembler_t);
+section_t   assembler_get_section(assembler_t);
