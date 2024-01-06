@@ -88,7 +88,7 @@ section_compare_eq(section_t s1, section_t s2) {
 		return false;                  // (NULL, s2.buffer)
 	}
 	if(!s2) {
-	  if(!s1->buffer) return true;   // (s1.buffer==NULL, NULL)
+		if(!s1->buffer) return true;   // (s1.buffer==NULL, NULL)
     return false;                  // (s1.buffer, NULL)
 	}
 

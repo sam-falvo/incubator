@@ -2,14 +2,14 @@
 
 #include "statement.h"
 
-typedef struct hlxa_desc *hlxa_t;
+typedef struct assembler_desc *assembler_t;
 
 #define ERRF_MISSING_OPERAND   0x0001
 #define ERRF_UNKNOWN_MNEMONIC  0x0002
 #define ERRF_BAD_OPERAND       0x0004
 
-hlxa_t hlxa_new(void);
-void   hlxa_free(hlxa_t *);
-void   hlxa_set_section(hlxa_t, section_t);
-void   hlxa_assemble_statement(hlxa_t, section_t, statement_t);
-int    hlxa_errors(hlxa_t);
+assembler_t assembler_new(void);
+void        assembler_free(assembler_t *);
+void        assembler_set_section(assembler_t, section_t);
+void        assembler_assemble_statement(assembler_t, section_t, statement_t);
+int         assembler_errors(assembler_t);

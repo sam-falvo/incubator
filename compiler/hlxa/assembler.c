@@ -9,34 +9,34 @@
 #include "assembler.h"
 #include "dc_context.h"
 
-static hlxa_t hlxa_alloc(void);
-static hlxa_t hlxa_init(hlxa_t);
+static assembler_t assembler_alloc(void);
+static assembler_t assembler_init(assembler_t);
 
-struct hlxa_desc {
+struct assembler_desc {
 	section_t current_section;   // Section into which we're currently assembling
 	int       errors;
 };
 
-static hlxa_t
-hlxa_alloc(void) {
-	return (hlxa_t)malloc(sizeof(struct hlxa_desc));
+static assembler_t
+assembler_alloc(void) {
+	return (assembler_t)malloc(sizeof(struct assembler_desc));
 }
 
-static hlxa_t
-hlxa_init(hlxa_t a) {
+static assembler_t
+assembler_init(assembler_t a) {
 	if(a) {
-		memset(a, 0, sizeof(struct hlxa_desc));
+		memset(a, 0, sizeof(struct assembler_desc));
 	}
 	return a;
 }
 
-hlxa_t
-hlxa_new(void) {
-	return hlxa_init(hlxa_alloc());
+assembler_t
+assembler_new(void) {
+	return assembler_init(assembler_alloc());
 }
 
 void
-hlxa_free(hlxa_t *pa) {
+assembler_free(assembler_t *pa) {
 	if(pa && *pa) {
 		free(*pa);
 		*pa = NULL;
@@ -45,13 +45,13 @@ hlxa_free(hlxa_t *pa) {
 
 // Sets the section into which the assembler is generating code.
 void
-hlxa_set_section(hlxa_t a, section_t s) {
+assembler_set_section(assembler_t a, section_t s) {
 	a->current_section = s;
 }
 
 // Attempts to assemble a single source line.
 void
-hlxa_assemble_statement(hlxa_t a, section_t inp, statement_t s) {
+assembler_assemble_statement(assembler_t a, section_t inp, statement_t s) {
 	slice_t operand_slice = statement_borrow_operand(s);
 	struct dc_context_desc context;
 	int i, ch;
@@ -102,6 +102,6 @@ hlxa_assemble_statement(hlxa_t a, section_t inp, statement_t s) {
 
 // Answers with the current set of errors.
 int
-hlxa_errors(hlxa_t a) {
+assembler_errors(assembler_t a) {
 	return a->errors;
 }
