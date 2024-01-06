@@ -9,7 +9,7 @@
 #include "slice.h"
 #include "section.h"
 #include "statement.h"
-#include "hlxa.h"
+#include "assembler.h"
 
 void
 print_table_header(void) {

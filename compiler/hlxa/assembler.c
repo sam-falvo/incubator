@@ -6,7 +6,7 @@
 
 #include "reader.h"
 #include "section.h"
-#include "hlxa.h"
+#include "assembler.h"
 #include "dc_context.h"
 
 static hlxa_t hlxa_alloc(void);
