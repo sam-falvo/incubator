@@ -51,6 +51,14 @@ section_guarantee_buffer(section_t s) {
 	}
 }
 
+static void
+append_byte(section_t s, uint8_t byte) {
+	if(s->buffer) {
+		s->buffer[s->length] = byte;
+		++ s->length;
+	}
+}
+
 // Append a byte to the indicated section buffer.
 //
 // This MAY involve a buffer reallocation if there's not enough space.
@@ -61,13 +69,22 @@ section_guarantee_buffer(section_t s) {
 void
 section_append_byte(section_t s, uint8_t byte) {
 	section_guarantee_buffer(s);
+
 	if(s->length < s->capacity) {
-		if(s->buffer) {
-			s->buffer[s->length] = byte;
-			++ s->length;
-		}
+		append_byte(s, byte);
+		return;
 	}
-	// How to handle out-of-memory case here?
+
+	s->capacity *= 2;
+	s->buffer = realloc(s->buffer, s->capacity);
+	if(s->buffer) {
+		append_byte(s, byte);
+		return;
+	}
+
+	fprintf(stderr, "** Out of memory managing section memory; section lost.\n");
+	s->length = 0;
+	s->capacity = 0;
 }
 
 // Compare the contents of two buffers for equality.
