@@ -102,8 +102,11 @@ DROP
 : Iimm ( n -- n' )
   $0FFF AND 20 LSHIFT ;
 
-: Ishamt ( n -- n' )
+: Ishamt6 ( n -- n' )
   63 AND 20 LSHIFT ;
+
+: Ishamt5 ( n -- n' )
+  31 AND 20 LSHIFT ;
 
 : Bdisp ( n -- n' )
   >R R@ bit12 31 LSHIFT
@@ -116,10 +119,13 @@ DROP
      R> bits4-0 7 LSHIFT OR ;
 
 : typeI, ( imm rs1 rd fn3 opc -- )
-  OP<< SWAP FN3<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Ishamt OR W, ;
+  OP<< SWAP FN3<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Iimm OR W, ;
 
-: typeIsh, ( shamt rs1 rd fn6 fn3 opc -- )
-  OP<< SWAP FN3<< OR SWAP FN6<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Ishamt OR W, ;
+: typeIsh5, ( shamt rs1 rd fn7 fn3 opc -- )
+  OP<< SWAP FN3<< OR SWAP FN7<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Ishamt5 OR W, ;
+
+: typeIsh6, ( shamt rs1 rd fn6 fn3 opc -- )
+  OP<< SWAP FN3<< OR SWAP FN6<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Ishamt6 OR W, ;
 
 : typeB, ( disp13 rs1 rs2 fn3 opc -- )
   OP<< SWAP FN3<< OR SWAP RS2<< OR RS1<< OR Bdisp OR W, ;
@@ -170,9 +176,9 @@ BINARY
 : ori,                        110 0010011 typeI, ;
 : andi,                       111 0010011 typeI, ;
 
-: slli, ( shamt rs1 rd - )    000000 001 0010011 typeIsh, ;
-: srli,                       000000 101 0010011 typeIsh, ;
-: srai,                       010000 101 0010011 typeIsh, ;
+: slli, ( shamt rs1 rd - )    000000 001 0010011 typeIsh6, ;
+: srli,                       000000 101 0010011 typeIsh6, ;
+: srai,                       010000 101 0010011 typeIsh6, ;
 
 : add, ( rs1 rs2 rd - )       0000000 000 0010011 typeR, ;
 : sub,                        0100000 000 0010011 typeR, ;
@@ -203,5 +209,28 @@ DECIMAL
 : ebreak, ( - )
   1         0         0        0 $73 typeI, ;
 
-DECIMAL
+BINARY
+
+\ RV64I-specifics
+
+: addiw, ( imm rs1 rd - )     000 0011011 typeI, ;
+
+: slliw, ( shamt rs1 rd - )   0000000 001 0011011 typeIsh5, ;
+: srliw,                      0000000 101 0011011 typeIsh5, ;
+: sraiw,                      0100000 101 0011011 typeIsh5, ;
+
+: addw, ( rs1 rs2 rd - )      0000000 000 0111011 typeR, ;
+: subw,                       0100000 000 0111011 typeR, ;
+: sllw,                       0000000 001 0111011 typeR, ;
+: srlw,                       0000000 101 0111011 typeR, ;
+: sraw,                       0100000 101 0111011 typeR, ;
+
+: fence.i, ( imm rs1 rd - )   001 0001111 typeI, ;
+
+: csrrw, ( csr rs1 rd - )     001 1110011 typeI, ;
+: csrrs,                      010 1110011 typeI, ;
+: csrrc,                      011 1110011 typeI, ;
+: csrrwi, ( csr imm5 rd - )   101 1110011 typeI, ;
+: csrrsi,                     110 1110011 typeI, ;
+: csrrci,                     111 1110011 typeI, ;
 
