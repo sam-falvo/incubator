@@ -297,3 +297,9 @@ DECIMAL
   - DUP ." displacement = " . cr ( aJAL disp )
   SWAP mergeU ;
 
+: :, ( - )
+  CREATE THERE ,
+  DOES>  @ THERE - ra jal, ;
+
+: ;, ( - )
+  0 ra x0 jalr, ;
