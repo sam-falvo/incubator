@@ -288,3 +288,12 @@ DECIMAL
     2DROP
   THEN ;
 
+: defer, ( - )
+  CREATE 0 quote, , ( JAL X0,... )
+  DOES>  @ THERE - ra jal, ;
+
+: is, ( a - )
+  ' >BODY @ SWAP OVER ( aJAL a aJAL )
+  - DUP ." displacement = " . cr ( aJAL disp )
+  SWAP mergeU ;
+
