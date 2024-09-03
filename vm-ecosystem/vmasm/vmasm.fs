@@ -1,9 +1,35 @@
 ( These work for GForth under Linux.  You'll probably need to adapt these for your platform. )
 
-: B, ( n -- ) C, ;
-: H, ( n -- ) DUP B, 8 RSHIFT B, ;
-: W, ( n -- ) DUP H, 16 RSHIFT H, ;
-: D, ( n -- ) , ;
+262144 4096 - CONSTANT /tImage
+CREATE tImage
+  /tImage ALLOT
+
+: >real ( addr - addr' )   tImage + ;
+: >img  ( addr' - addr )   tImage - ;
+
+
+VARIABLE tH
+: ORG ( n - )       tH ! ;
+: THERE ( - a )     tH @ ;
+: TALLOT ( n - )    tH +! ;
+: TALIGN ( - )      tH @ 3 + -4 AND tH ! ;
+
+
+: B! ( n addr - )   >real C! ;
+: H! ( n addr - )   2DUP B! SWAP 8 RSHIFT SWAP 1 + B! ;
+: W! ( n addr - )   2DUP H! SWAP 16 RSHIFT SWAP 2 + H! ;
+: D! ( n addr - )   2DUP W! SWAP 32 RSHIFT SWAP 4 + W! ;
+
+: B@ ( addr - n )   >real C@ ;
+: H@ ( addr - n )   DUP B@ SWAP 1+ B@ 8 LSHIFT OR ;
+: W@ ( addr - n )   DUP H@ SWAP 2 + H@ 16 LSHIFT OR ;
+: D@ ( addr - n )   DUP W@ SWAP 4 + W@ 32 LSHIFT OR ;
+
+: B, ( n -- ) THERE B!   1 TALLOT ;
+: H, ( n -- ) THERE H!   2 TALLOT ;
+: W, ( n -- ) THERE W!   4 TALLOT ;
+: D, ( n -- ) THERE D!   8 TALLOT ;
+
 
 : BINARY   2 BASE ! ;
 
@@ -234,3 +260,4 @@ BINARY
 : csrrsi,                     110 1110011 typeI, ;
 : csrrci,                     111 1110011 typeI, ;
 
+DECIMAL
