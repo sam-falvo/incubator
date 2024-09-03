@@ -1,6 +1,6 @@
 ( These work for GForth under Linux.  You'll probably need to adapt these for your platform. )
 
-262144 4096 - CONSTANT /tImage
+262144 CONSTANT /tImage
 CREATE tImage
   /tImage ALLOT
 
