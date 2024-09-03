@@ -261,3 +261,30 @@ BINARY
 : csrrci,                     111 1110011 typeI, ;
 
 DECIMAL
+
+
+\ Convenient Constructs and Macros
+
+: quote, ( xr -- aJAL )
+  ( Jumps AHEAD, except sets xr to point at code immediately following. )
+  THERE SWAP 0 SWAP jal, ;
+
+: mergeU ( disp addr -- )
+  SWAP Jdisp OVER ( addr disp addr )
+  W@ ( addr disp JAL )
+  OR ( addr JAL' - this works as long as operand of JAL is 0 )
+  SWAP W! ;
+
+: unquote, ( aJAL xr -- )
+  ( Resolves prior quote, and sets xr to length of block spanned. )
+  OVER THERE SWAP - 4 - ( aJAL xr len; 4 accounts for JAL insn )
+  TALIGN >R >R ( aJAL || xr len )
+  THERE OVER - ( aJAL disp || xr len )
+  OVER mergeU ( || xr len )
+  R> R> ( xr len )
+  OVER IF
+    SWAP x0 SWAP ori,
+  ELSE
+    2DROP
+  THEN ;
+
