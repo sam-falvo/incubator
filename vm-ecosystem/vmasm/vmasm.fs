@@ -4,8 +4,9 @@
 CREATE tImage
   /tImage ALLOT
 
-: >real ( addr - addr' )   tImage + ;
-: >img  ( addr' - addr )   tImage - ;
+: >real ( addr - addr' )              tImage + ;
+: 2>real ( addr addr - addr' addr' )  >real SWAP >real SWAP ;
+: >img  ( addr' - addr )              tImage - ;
 
 
 VARIABLE tH
@@ -13,6 +14,15 @@ VARIABLE tH
 : THERE ( - a )     tH @ ;
 : TALLOT ( n - )    tH +! ;
 : TALIGN ( - )      tH @ 3 + -4 AND tH ! ;
+
+
+: TSAVE ( start end caddr u -- )
+  W/O CREATE-FILE THROW >R
+  2>real OVER - R@ WRITE-FILE THROW
+  R> CLOSE-FILE THROW ;
+
+: TSAVE" ( start end -- "filename" )
+  [CHAR] " PARSE TSAVE ;
 
 
 : B! ( n addr - )   >real C! ;
@@ -303,3 +313,4 @@ DECIMAL
 
 : ;, ( - )
   0 ra x0 jalr, ;
+
