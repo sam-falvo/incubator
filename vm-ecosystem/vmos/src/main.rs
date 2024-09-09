@@ -47,22 +47,74 @@ fn main() -> io::Result<()> {
             (((cpu.instruction >> 20) & 1) << 11) |
             (((cpu.instruction >> 12) & 0xFF) << 12)
         ) as i64 as u64;
+        let bdisp = (
+            (((cpu.instruction >> 31) & 1) << 12) |
+            (((cpu.instruction >> 25) & 0x3F) << 5) |
+            (((cpu.instruction >> 8) & 0xF) << 1) |
+            (((cpu.instruction >> 7) & 1) << 11)
+        ) as i64 as u64;
         let mut npc = cpu.pc + 4;
 
         match opcode {
+            // LUI
             0x37 => cpu.xr[rd] = uimm,
-            0x17 => cpu.xr[rd] = cpu.pc.wrapping_add(cpu.pc),
+            // AUIPC
+            0x17 => cpu.xr[rd] = cpu.pc.wrapping_add(uimm),
+            // JAL
             0x6F => cpu.xr[rd] = cpu.pc.wrapping_add(jdisp),
+            // JALR
             0x67 => { cpu.xr[rd] = npc; npc = cpu.xr[rs1] + iimm },
+            // BEQ/BNE BLT/BGE BLTU/BGEU
+            0x63 => {
+                match fn3 {
+                    0 => { if cpu.xr[rs1] == cpu.xr[rs2] { npc = cpu.pc.wrapping_add(bdisp) } }
+                    1 => { if cpu.xr[rs1] != cpu.xr[rs2] { npc = cpu.pc.wrapping_add(bdisp) } }
+                    2 | 3 => {
+                        cpu.scause = TrapCause::IllegalInstruction;
+                        cpu.sepc = cpu.pc;
+                        cpu.stval = cpu.instruction as u64;
+                        npc = cpu.pc;
+                    }
+                    4 => { if (cpu.xr[rs1] as i64) < (cpu.xr[rs2] as i64) { npc = cpu.pc.wrapping_add(bdisp) } }
+                    5 => { if (cpu.xr[rs1] as i64) >= (cpu.xr[rs2] as i64) { npc = cpu.pc.wrapping_add(bdisp) } }
+                    6 => { if (cpu.xr[rs1] as u64) < (cpu.xr[rs2] as u64) { npc = cpu.pc.wrapping_add(bdisp) } }
+                    7 => { if (cpu.xr[rs1] as u64) >= (cpu.xr[rs2] as u64) { npc = cpu.pc.wrapping_add(bdisp) } }
+                }
+            }
+            // LB/LH/LW/LD
+            // LBU/LHU/LWU/LDU
+            // SB/SH/SW/SD
+            // ADDI
+            // SLTI
+            // SLTIU
+            // XORI
+            // ORI
+            // ANDI
+            // SLLI
+            // SRLI
+            // SRAI
+            // ADD
+            // SUB
+            // SLL
+            // SLT
+            // SLTU
+            // XOR
+            // SRL
+            // SRA
+            // OR
+            // AND
+            // FENCE
+            // ECALL/EBREAK
 
             _ => {
                 cpu.scause = TrapCause::IllegalInstruction;
                 cpu.sepc = cpu.pc;
                 cpu.stval = cpu.instruction as u64;
-                npc = 0;
+                npc = cpu.pc;
             }
         }
 
+        cpu.xr[0] = 0;
         cpu.pc = npc;
         cpu.fetch(&code);
     }
