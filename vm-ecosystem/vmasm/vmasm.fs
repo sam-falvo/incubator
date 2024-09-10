@@ -164,10 +164,10 @@ DROP
   OP<< SWAP FN3<< OR SWAP FN6<< OR SWAP RD<< OR SWAP RS1<< OR SWAP Ishamt6 OR W, ;
 
 : typeB, ( disp13 rs1 rs2 fn3 opc -- )
-  OP<< SWAP FN3<< OR SWAP RS2<< OR RS1<< OR Bdisp OR W, ;
+  OP<< SWAP FN3<< OR SWAP RS2<< OR SWAP RS1<< OR SWAP Bdisp OR W, ;
 
 : typeBs, ( imm12 rs1 rs2 fn3 opc -- )
-  OP<< SWAP FN3<< OR SWAP RS2<< OR RS1<< OR Bimm OR W, ;
+  OP<< SWAP FN3<< OR SWAP RS2<< OR SWAP RS1<< OR SWAP Bimm OR W, ;
 
 : typeR, ( rs1 rs2 rd fn7 fn3 opc -- )
   OP<< SWAP FN3<< OR SWAP FN7<< OR SWAP RD<< OR SWAP RS2<< OR SWAP RS1<< OR W, ;
@@ -308,9 +308,23 @@ DECIMAL
   SWAP mergeU ;
 
 : :, ( - )
-  CREATE THERE ,
+  CREATE THERE ,  -8 sp sp addi,  0 sp ra sd,
   DOES>  @ THERE - ra jal, ;
 
 : ;, ( - )
-  0 ra x0 jalr, ;
+  0 sp ra ld,  8 sp sp addi,  0 ra x0 jalr, ;
+
+: load-sp, ( sp - )
+  >R R@ -2048 2047 WITHIN IF R> x0 sp addi, EXIT THEN
+     R@ -$80000000 $7FFFFFFF WITHIN IF
+         R@ $800 AND R@ +  sp lui,  ( weird logic accounts for sign-extension in addi, below )
+         R> $FFF AND DUP IF
+             sp sp addi,
+         THEN  EXIT
+     THEN
+     -1 abort" Value too large" ;
+
+: init:, ( sp - )
+  CREATE THERE ,  load-sp,  0 sp ra sd,
+  DOES>  @ THERE - ra jal, ;
 
