@@ -50,7 +50,9 @@ fn main() -> io::Result<()> {
         let fn3 = (cpu.instruction >> 12) & 0x07;
         let rs1 = ((cpu.instruction >> 15) & 0x1F) as usize;
         let rs2 = ((cpu.instruction >> 20) & 0x1F) as usize;
-        let fn7 = (cpu.instruction >> 25) & 0x7F;
+        let _fn7 = (cpu.instruction >> 25) & 0x7F;
+        let shamt6 = (cpu.instruction >> 20) & 0x3F;
+        let _shamt5 = shamt6 & 0x1F;
         let iimm = sign_extend(((cpu.instruction >> 20) & 0xFFF) as u64, 11);
         let uimm = sign_extend((cpu.instruction & 0xFFFFF000) as u64, 31);
         let jdisp = sign_extend(
@@ -145,10 +147,59 @@ fn main() -> io::Result<()> {
             }
             // ADDI SLTI SLTIU XORI ORI ANDI SLLI SRLI SRAI
             0x13 => {
+                let v = iimm;
+                match fn3 {
+                    0 => cpu.xr[rd] = cpu.xr[rs1].wrapping_add(v),
+                    1 => cpu.xr[rd] = cpu.xr[rs1] << shamt6,
+                    2 => cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) { 1 } else { 0 },
+                    3 => cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) { 1 } else { 0 },
+                    4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
+                    5 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                        ((cpu.xr[rs1] as i64) >> shamt6) as u64
+                    } else {
+                        cpu.xr[rs1] >> shamt6
+                    },
+                    6 => cpu.xr[rd] = cpu.xr[rs1] | v,
+                    7 => cpu.xr[rd] = cpu.xr[rs1] & v,
+                    8..=u32::MAX => unreachable!(),
+                }
             }
             // ADD SUB SLL SLT SLTU XOR SRL SRA OR AND
-            // FENCE
+            0x33 => {
+                let v = cpu.xr[rs2];
+                match fn3 {
+                    0 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                        cpu.xr[rs1].wrapping_sub(v)
+                    } else {
+                        cpu.xr[rs1].wrapping_add(v)
+                    },
+                    1 => cpu.xr[rd] = cpu.xr[rs1] << v,
+                    2 => cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) { 1 } else { 0 },
+                    3 => cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) { 1 } else { 0 },
+                    4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
+                    5 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                        ((cpu.xr[rs1] as i64) >> v) as u64
+                    } else {
+                        cpu.xr[rs1] >> v
+                    },
+                    6 => cpu.xr[rd] = cpu.xr[rs1] | v,
+                    7 => cpu.xr[rd] = cpu.xr[rs1] & v,
+                    8..=u32::MAX => unreachable!(),
+                }
+            }
+            // FENCE and friends -- friendly NOPs for us.
+            0x0F => (),
             // ECALL/EBREAK
+            0x73 => {
+                cpu.scause = if ((cpu.instruction >> 30) & 1) != 0 {
+                    TrapCause::Breakpoint
+                } else {
+                    TrapCause::EnvironmentCallFromUmode
+                };
+                cpu.sepc = cpu.pc;
+                cpu.stval = cpu.instruction as u64;
+                npc = cpu.pc;
+            },
 
             _ => {
                 cpu.scause = TrapCause::IllegalInstruction;
@@ -320,7 +371,7 @@ impl Cpu {
     }
 
     fn store_byte_unchecked(&mut self, ram: &mut Vec<u8>, addr: u64, val: u8) {
-        if let Some(mut b) = ram.get_mut(addr as usize) {
+        if let Some(b) = ram.get_mut(addr as usize) {
             *b = val;
         }
     }
