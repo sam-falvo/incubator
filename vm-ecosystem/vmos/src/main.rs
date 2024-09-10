@@ -39,240 +39,31 @@ fn main() -> io::Result<()> {
 
     let mut cpu = Cpu::new(0);
 
-    cpu.fetch(&code);
-    while cpu.scause == TrapCause::None {
-        println!("Insn: {:08X}", cpu.instruction);
-        let opcode = (cpu.instruction >> 0) & 0x7F;
-        let rd = ((cpu.instruction >> 7) & 0x1F) as usize;
-        let fn3 = (cpu.instruction >> 12) & 0x07;
-        let rs1 = ((cpu.instruction >> 15) & 0x1F) as usize;
-        let rs2 = ((cpu.instruction >> 20) & 0x1F) as usize;
-        let _fn7 = (cpu.instruction >> 25) & 0x7F;
-        let shamt6 = (cpu.instruction >> 20) & 0x3F;
-        let _shamt5 = shamt6 & 0x1F;
-        let iimm = sign_extend(((cpu.instruction >> 20) & 0xFFF) as u64, 11);
-        let uimm = sign_extend((cpu.instruction & 0xFFFFF000) as u64, 31);
-        let jdisp = sign_extend(
-            ((((cpu.instruction >> 31) & 1) << 20)
-                | (((cpu.instruction >> 21) & 0x3FF) << 1)
-                | (((cpu.instruction >> 20) & 1) << 11)
-                | (((cpu.instruction >> 12) & 0xFF) << 12)) as u64,
-            20,
-        );
-        let bdisp = sign_extend(
-            ((((cpu.instruction >> 31) & 1) << 12)
-                | (((cpu.instruction >> 25) & 0x3F) << 5)
-                | (((cpu.instruction >> 8) & 0xF) << 1)
-                | (((cpu.instruction >> 7) & 1) << 11)) as u64,
-            12,
-        );
-        let simm = sign_extend(
-            ((((cpu.instruction >> 25) & 0x7F) << 5) | (((cpu.instruction >> 7) & 0x1F) << 0))
-                as u64,
-            11,
-        );
-        let mut npc = cpu.pc + 4;
+    let mut done = false;
+    while !done {
+        cpu.run_until_trap(&mut code);
 
-        match opcode {
-            // LUI
-            0x37 => cpu.xr[rd] = uimm,
-            // AUIPC
-            0x17 => cpu.xr[rd] = cpu.pc.wrapping_add(uimm),
-            // JAL
-            0x6F => {
-                cpu.xr[rd] = npc;
-                npc = cpu.pc.wrapping_add(jdisp)
-            }
-            // JALR
-            0x67 => {
-                cpu.xr[rd] = npc;
-                npc = cpu.xr[rs1] + iimm
-            }
-            // BEQ/BNE BLT/BGE BLTU/BGEU
-            0x63 => match fn3 {
-                0 => {
-                    if cpu.xr[rs1] == cpu.xr[rs2] {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                1 => {
-                    if cpu.xr[rs1] != cpu.xr[rs2] {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                2 | 3 => {
-                    cpu.scause = TrapCause::IllegalInstruction;
-                    cpu.sepc = cpu.pc;
-                    cpu.stval = cpu.instruction as u64;
-                    npc = cpu.pc;
-                }
-                4 => {
-                    if (cpu.xr[rs1] as i64) < (cpu.xr[rs2] as i64) {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                5 => {
-                    if (cpu.xr[rs1] as i64) >= (cpu.xr[rs2] as i64) {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                6 => {
-                    if (cpu.xr[rs1] as u64) < (cpu.xr[rs2] as u64) {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                7 => {
-                    if (cpu.xr[rs1] as u64) >= (cpu.xr[rs2] as u64) {
-                        npc = cpu.pc.wrapping_add(bdisp)
-                    }
-                }
-                8..=u32::MAX => unreachable!(),
-            },
-            // LB/LH/LW/LD
-            // LBU/LHU/LWU/LDU
-            0x03 => {
-                let ea = cpu.xr[rs1].wrapping_add(iimm);
+        done = match cpu.scause {
+            TrapCause::EnvironmentCallFromUmode => {
+                let function_code = cpu.xr[17];
 
-                cpu.xr[rd] = match fn3 {
-                    0 => sign_extend(cpu.load_byte(&code, ea) as u64, 7),
-                    1 => sign_extend(cpu.load_hword(&code, ea) as u64, 15),
-                    2 => sign_extend(cpu.load_word(&code, ea) as u64, 31),
-                    3 => sign_extend(cpu.load_dword(&code, ea) as u64, 63),
-                    4 => cpu.load_byte(&code, ea) as u64,
-                    5 => cpu.load_hword(&code, ea) as u64,
-                    6 => cpu.load_word(&code, ea) as u64,
-                    7 => cpu.load_dword(&code, ea) as u64,
-                    8..=u32::MAX => unreachable!(),
-                }
-            }
-            // SB/SH/SW/SD
-            0x23 => {
-                let ea = cpu.xr[rs1].wrapping_add(simm);
-                let v = cpu.xr[rs2];
+                match function_code {
+                    0x2A => {
+                        print!("{}", cpu.xr[10] as u8 as char);
 
-                match fn3 {
-                    0 => cpu.store_byte(&mut code, ea, v as u8),
-                    1 => cpu.store_hword(&mut code, ea, v as u16),
-                    2 => cpu.store_word(&mut code, ea, v as u32),
-                    3 => cpu.store_dword(&mut code, ea, v as u64),
-                    4 | 5 | 6 | 7 => {
-                        cpu.scause = TrapCause::IllegalInstruction;
-                        cpu.sepc = cpu.pc;
-                        cpu.stval = cpu.instruction as u64;
-                        npc = cpu.pc;
+                        cpu.scause = TrapCause::None;
+                        cpu.pc = cpu.sepc + 4;
+                        false
                     }
-                    8..=u32::MAX => unreachable!(),
+                    _ => true,
                 }
             }
-            // ADDI SLTI SLTIU XORI ORI ANDI SLLI SRLI SRAI
-            0x13 => {
-                let v = iimm;
-                match fn3 {
-                    0 => cpu.xr[rd] = cpu.xr[rs1].wrapping_add(v),
-                    1 => cpu.xr[rd] = cpu.xr[rs1] << shamt6,
-                    2 => {
-                        cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    3 => {
-                        cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
-                    5 => {
-                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                            ((cpu.xr[rs1] as i64) >> shamt6) as u64
-                        } else {
-                            cpu.xr[rs1] >> shamt6
-                        }
-                    }
-                    6 => cpu.xr[rd] = cpu.xr[rs1] | v,
-                    7 => cpu.xr[rd] = cpu.xr[rs1] & v,
-                    8..=u32::MAX => unreachable!(),
-                }
-            }
-            // ADD SUB SLL SLT SLTU XOR SRL SRA OR AND
-            0x33 => {
-                let v = cpu.xr[rs2];
-                match fn3 {
-                    0 => {
-                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                            cpu.xr[rs1].wrapping_sub(v)
-                        } else {
-                            cpu.xr[rs1].wrapping_add(v)
-                        }
-                    }
-                    1 => cpu.xr[rd] = cpu.xr[rs1] << v,
-                    2 => {
-                        cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    3 => {
-                        cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
-                    5 => {
-                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                            ((cpu.xr[rs1] as i64) >> v) as u64
-                        } else {
-                            cpu.xr[rs1] >> v
-                        }
-                    }
-                    6 => cpu.xr[rd] = cpu.xr[rs1] | v,
-                    7 => cpu.xr[rd] = cpu.xr[rs1] & v,
-                    8..=u32::MAX => unreachable!(),
-                }
-            }
-            // FENCE and friends -- friendly NOPs for us.
-            0x0F => (),
-            // ECALL/EBREAK
-            0x73 => {
-                cpu.scause = match iimm {
-                    0 => TrapCause::EnvironmentCallFromUmode,
-                    1 => TrapCause::Breakpoint,
-                    _ => TrapCause::IllegalInstruction,
-                };
-                cpu.sepc = cpu.pc;
-                cpu.stval = cpu.instruction as u64;
-                npc = cpu.pc;
-            }
-
-            _ => {
-                cpu.scause = TrapCause::IllegalInstruction;
-                cpu.sepc = cpu.pc;
-                cpu.stval = cpu.instruction as u64;
-                npc = cpu.pc;
-            }
+            _ => true,
         }
-
-        cpu.xr[0] = 0;
-        cpu.pc = npc;
-        cpu.fetch(&code);
     }
 
-    println!(
-        "TRAP!\n INSN={:08X}  SCAUSE={:?} SEPC={:016X} STVAL={:016X}\n",
-        cpu.instruction, cpu.scause, cpu.sepc, cpu.stval
-    );
-    for x in (0..32).step_by(4) {
-        print!("  X{:02}={:016X} ", x, cpu.xr[x]);
-        print!("  X{:02}={:016X} ", x + 1, cpu.xr[x + 1]);
-        print!("  X{:02}={:016X} ", x + 2, cpu.xr[x + 2]);
-        print!("  X{:02}={:016X}\n", x + 3, cpu.xr[x + 3]);
-    }
+    println!("TRAP!");
+    cpu.dump_regs();
 
     Ok(())
 }
@@ -316,6 +107,19 @@ impl Cpu {
             scause: TrapCause::None,
             sepc: 0,
             stval: 0,
+        }
+    }
+
+    fn dump_regs(&self) {
+        println!(
+            "PC={:016X} INSN={:08X}  SCAUSE={:?} SEPC={:016X} STVAL={:016X}\n",
+            self.pc, self.instruction, self.scause, self.sepc, self.stval
+        );
+        for x in (0..32).step_by(4) {
+            print!("  X{:02} {:016X}  ", x, self.xr[x]);
+            print!("  X{:02} {:016X}  ", x + 1, self.xr[x + 1]);
+            print!("  X{:02} {:016X}  ", x + 2, self.xr[x + 2]);
+            print!("  X{:02} {:016X}\n", x + 3, self.xr[x + 3]);
         }
     }
 
@@ -471,6 +275,235 @@ impl Cpu {
             self.scause = TrapCause::LoadAccessFault;
             self.sepc = self.pc;
             self.stval = addr;
+        }
+    }
+
+    fn step(&mut self, ram: &mut Vec<u8>) {
+        let opcode = (self.instruction >> 0) & 0x7F;
+        let rd = ((self.instruction >> 7) & 0x1F) as usize;
+        let fn3 = (self.instruction >> 12) & 0x07;
+        let rs1 = ((self.instruction >> 15) & 0x1F) as usize;
+        let rs2 = ((self.instruction >> 20) & 0x1F) as usize;
+        let _fn7 = (self.instruction >> 25) & 0x7F;
+        let shamt6 = (self.instruction >> 20) & 0x3F;
+        let _shamt5 = shamt6 & 0x1F;
+        let iimm = sign_extend(((self.instruction >> 20) & 0xFFF) as u64, 11);
+        let uimm = sign_extend((self.instruction & 0xFFFFF000) as u64, 31);
+        let jdisp = sign_extend(
+            ((((self.instruction >> 31) & 1) << 20)
+                | (((self.instruction >> 21) & 0x3FF) << 1)
+                | (((self.instruction >> 20) & 1) << 11)
+                | (((self.instruction >> 12) & 0xFF) << 12)) as u64,
+            20,
+        );
+        let bdisp = sign_extend(
+            ((((self.instruction >> 31) & 1) << 12)
+                | (((self.instruction >> 25) & 0x3F) << 5)
+                | (((self.instruction >> 8) & 0xF) << 1)
+                | (((self.instruction >> 7) & 1) << 11)) as u64,
+            12,
+        );
+        let simm = sign_extend(
+            ((((self.instruction >> 25) & 0x7F) << 5) | (((self.instruction >> 7) & 0x1F) << 0))
+                as u64,
+            11,
+        );
+        let mut npc = self.pc + 4;
+
+        match opcode {
+            // LUI
+            0x37 => self.xr[rd] = uimm,
+            // AUIPC
+            0x17 => self.xr[rd] = self.pc.wrapping_add(uimm),
+            // JAL
+            0x6F => {
+                self.xr[rd] = npc;
+                npc = self.pc.wrapping_add(jdisp)
+            }
+            // JALR
+            0x67 => {
+                self.xr[rd] = npc;
+                npc = self.xr[rs1] + iimm
+            }
+            // BEQ/BNE BLT/BGE BLTU/BGEU
+            0x63 => match fn3 {
+                0 => {
+                    if self.xr[rs1] == self.xr[rs2] {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                1 => {
+                    if self.xr[rs1] != self.xr[rs2] {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                2 | 3 => {
+                    self.scause = TrapCause::IllegalInstruction;
+                    self.sepc = self.pc;
+                    self.stval = self.instruction as u64;
+                    npc = self.pc;
+                }
+                4 => {
+                    if (self.xr[rs1] as i64) < (self.xr[rs2] as i64) {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                5 => {
+                    if (self.xr[rs1] as i64) >= (self.xr[rs2] as i64) {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                6 => {
+                    if (self.xr[rs1] as u64) < (self.xr[rs2] as u64) {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                7 => {
+                    if (self.xr[rs1] as u64) >= (self.xr[rs2] as u64) {
+                        npc = self.pc.wrapping_add(bdisp)
+                    }
+                }
+                8..=u32::MAX => unreachable!(),
+            },
+            // LB/LH/LW/LD
+            // LBU/LHU/LWU/LDU
+            0x03 => {
+                let ea = self.xr[rs1].wrapping_add(iimm);
+
+                self.xr[rd] = match fn3 {
+                    0 => sign_extend(self.load_byte(ram, ea) as u64, 7),
+                    1 => sign_extend(self.load_hword(ram, ea) as u64, 15),
+                    2 => sign_extend(self.load_word(ram, ea) as u64, 31),
+                    3 => sign_extend(self.load_dword(ram, ea) as u64, 63),
+                    4 => self.load_byte(ram, ea) as u64,
+                    5 => self.load_hword(ram, ea) as u64,
+                    6 => self.load_word(ram, ea) as u64,
+                    7 => self.load_dword(ram, ea) as u64,
+                    8..=u32::MAX => unreachable!(),
+                }
+            }
+            // SB/SH/SW/SD
+            0x23 => {
+                let ea = self.xr[rs1].wrapping_add(simm);
+                let v = self.xr[rs2];
+
+                match fn3 {
+                    0 => self.store_byte(ram, ea, v as u8),
+                    1 => self.store_hword(ram, ea, v as u16),
+                    2 => self.store_word(ram, ea, v as u32),
+                    3 => self.store_dword(ram, ea, v as u64),
+                    4 | 5 | 6 | 7 => {
+                        self.scause = TrapCause::IllegalInstruction;
+                        self.sepc = self.pc;
+                        self.stval = self.instruction as u64;
+                        npc = self.pc;
+                    }
+                    8..=u32::MAX => unreachable!(),
+                }
+            }
+            // ADDI SLTI SLTIU XORI ORI ANDI SLLI SRLI SRAI
+            0x13 => {
+                let v = iimm;
+                match fn3 {
+                    0 => self.xr[rd] = self.xr[rs1].wrapping_add(v),
+                    1 => self.xr[rd] = self.xr[rs1] << shamt6,
+                    2 => {
+                        self.xr[rd] = if (self.xr[rs1] as i64) < (v as i64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    3 => {
+                        self.xr[rd] = if (self.xr[rs1] as u64) < (v as u64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    4 => self.xr[rd] = self.xr[rs1] ^ v,
+                    5 => {
+                        self.xr[rd] = if ((self.instruction >> 30) & 1) != 0 {
+                            ((self.xr[rs1] as i64) >> shamt6) as u64
+                        } else {
+                            self.xr[rs1] >> shamt6
+                        }
+                    }
+                    6 => self.xr[rd] = self.xr[rs1] | v,
+                    7 => self.xr[rd] = self.xr[rs1] & v,
+                    8..=u32::MAX => unreachable!(),
+                }
+            }
+            // ADD SUB SLL SLT SLTU XOR SRL SRA OR AND
+            0x33 => {
+                let v = self.xr[rs2];
+                match fn3 {
+                    0 => {
+                        self.xr[rd] = if ((self.instruction >> 30) & 1) != 0 {
+                            self.xr[rs1].wrapping_sub(v)
+                        } else {
+                            self.xr[rs1].wrapping_add(v)
+                        }
+                    }
+                    1 => self.xr[rd] = self.xr[rs1] << v,
+                    2 => {
+                        self.xr[rd] = if (self.xr[rs1] as i64) < (v as i64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    3 => {
+                        self.xr[rd] = if (self.xr[rs1] as u64) < (v as u64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    4 => self.xr[rd] = self.xr[rs1] ^ v,
+                    5 => {
+                        self.xr[rd] = if ((self.instruction >> 30) & 1) != 0 {
+                            ((self.xr[rs1] as i64) >> v) as u64
+                        } else {
+                            self.xr[rs1] >> v
+                        }
+                    }
+                    6 => self.xr[rd] = self.xr[rs1] | v,
+                    7 => self.xr[rd] = self.xr[rs1] & v,
+                    8..=u32::MAX => unreachable!(),
+                }
+            }
+            // FENCE and friends -- friendly NOPs for us.
+            0x0F => (),
+            // ECALL/EBREAK
+            0x73 => {
+                self.scause = match iimm {
+                    0 => TrapCause::EnvironmentCallFromUmode,
+                    1 => TrapCause::Breakpoint,
+                    _ => TrapCause::IllegalInstruction,
+                };
+                self.sepc = self.pc;
+                self.stval = self.instruction as u64;
+                npc = self.pc;
+            }
+
+            _ => {
+                self.scause = TrapCause::IllegalInstruction;
+                self.sepc = self.pc;
+                self.stval = self.instruction as u64;
+                npc = self.pc;
+            }
+        }
+
+        self.xr[0] = 0;
+        self.pc = npc;
+        self.fetch(&ram);
+    }
+
+    fn run_until_trap(&mut self, ram: &mut Vec<u8>) {
+        self.fetch(ram);
+        while self.scause == TrapCause::None {
+            self.step(ram);
         }
     }
 }
