@@ -240,10 +240,10 @@ fn main() -> io::Result<()> {
             0x0F => (),
             // ECALL/EBREAK
             0x73 => {
-                cpu.scause = if ((cpu.instruction >> 30) & 1) != 0 {
-                    TrapCause::Breakpoint
-                } else {
-                    TrapCause::EnvironmentCallFromUmode
+                cpu.scause = match iimm {
+                    0 => TrapCause::EnvironmentCallFromUmode,
+                    1 => TrapCause::Breakpoint,
+                    _ => TrapCause::IllegalInstruction,
                 };
                 cpu.sepc = cpu.pc;
                 cpu.stval = cpu.instruction as u64;
