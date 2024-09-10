@@ -8,13 +8,11 @@ use std::io::prelude::*;
 /// Default RAM size (1MiB).
 pub const RAM_SIZE: u64 = 1024 * 1024;
 
-
 fn extend_to_ram_size(code: &mut Vec<u8>) {
     while code.len() < (RAM_SIZE as usize) {
         code.push(0xCC);
     }
 }
-
 
 fn sign_extend(input: u64, from_bit: usize) -> u64 {
     let bit = (input >> from_bit) & 1;
@@ -26,7 +24,6 @@ fn sign_extend(input: u64, from_bit: usize) -> u64 {
         input
     }
 }
-
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -56,29 +53,23 @@ fn main() -> io::Result<()> {
         let iimm = sign_extend(((cpu.instruction >> 20) & 0xFFF) as u64, 11);
         let uimm = sign_extend((cpu.instruction & 0xFFFFF000) as u64, 31);
         let jdisp = sign_extend(
-            (
-                (((cpu.instruction >> 31) & 1) << 20) |
-                (((cpu.instruction >> 21) & 0x3FF) << 1) |
-                (((cpu.instruction >> 20) & 1) << 11) |
-                (((cpu.instruction >> 12) & 0xFF) << 12)
-            ) as u64,
-            20
+            ((((cpu.instruction >> 31) & 1) << 20)
+                | (((cpu.instruction >> 21) & 0x3FF) << 1)
+                | (((cpu.instruction >> 20) & 1) << 11)
+                | (((cpu.instruction >> 12) & 0xFF) << 12)) as u64,
+            20,
         );
         let bdisp = sign_extend(
-            (
-                (((cpu.instruction >> 31) & 1) << 12) |
-                (((cpu.instruction >> 25) & 0x3F) << 5) |
-                (((cpu.instruction >> 8) & 0xF) << 1) |
-                (((cpu.instruction >> 7) & 1) << 11)
-            ) as u64,
-            12
+            ((((cpu.instruction >> 31) & 1) << 12)
+                | (((cpu.instruction >> 25) & 0x3F) << 5)
+                | (((cpu.instruction >> 8) & 0xF) << 1)
+                | (((cpu.instruction >> 7) & 1) << 11)) as u64,
+            12,
         );
         let simm = sign_extend(
-            (
-                (((cpu.instruction >> 25) & 0x7F) << 5) |
-                (((cpu.instruction >> 7) & 0x1F) << 0)
-            ) as u64,
-            11
+            ((((cpu.instruction >> 25) & 0x7F) << 5) | (((cpu.instruction >> 7) & 0x1F) << 0))
+                as u64,
+            11,
         );
         let mut npc = cpu.pc + 4;
 
@@ -88,27 +79,55 @@ fn main() -> io::Result<()> {
             // AUIPC
             0x17 => cpu.xr[rd] = cpu.pc.wrapping_add(uimm),
             // JAL
-            0x6F => { cpu.xr[rd] = npc; npc = cpu.pc.wrapping_add(jdisp) },
-            // JALR
-            0x67 => { cpu.xr[rd] = npc; npc = cpu.xr[rs1] + iimm },
-            // BEQ/BNE BLT/BGE BLTU/BGEU
-            0x63 => {
-                match fn3 {
-                    0 => { if cpu.xr[rs1] == cpu.xr[rs2] { npc = cpu.pc.wrapping_add(bdisp) } }
-                    1 => { if cpu.xr[rs1] != cpu.xr[rs2] { npc = cpu.pc.wrapping_add(bdisp) } }
-                    2 | 3 => {
-                        cpu.scause = TrapCause::IllegalInstruction;
-                        cpu.sepc = cpu.pc;
-                        cpu.stval = cpu.instruction as u64;
-                        npc = cpu.pc;
-                    }
-                    4 => { if (cpu.xr[rs1] as i64) < (cpu.xr[rs2] as i64) { npc = cpu.pc.wrapping_add(bdisp) } }
-                    5 => { if (cpu.xr[rs1] as i64) >= (cpu.xr[rs2] as i64) { npc = cpu.pc.wrapping_add(bdisp) } }
-                    6 => { if (cpu.xr[rs1] as u64) < (cpu.xr[rs2] as u64) { npc = cpu.pc.wrapping_add(bdisp) } }
-                    7 => { if (cpu.xr[rs1] as u64) >= (cpu.xr[rs2] as u64) { npc = cpu.pc.wrapping_add(bdisp) } }
-                    8..=u32::MAX => unreachable!(),
-                }
+            0x6F => {
+                cpu.xr[rd] = npc;
+                npc = cpu.pc.wrapping_add(jdisp)
             }
+            // JALR
+            0x67 => {
+                cpu.xr[rd] = npc;
+                npc = cpu.xr[rs1] + iimm
+            }
+            // BEQ/BNE BLT/BGE BLTU/BGEU
+            0x63 => match fn3 {
+                0 => {
+                    if cpu.xr[rs1] == cpu.xr[rs2] {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                1 => {
+                    if cpu.xr[rs1] != cpu.xr[rs2] {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                2 | 3 => {
+                    cpu.scause = TrapCause::IllegalInstruction;
+                    cpu.sepc = cpu.pc;
+                    cpu.stval = cpu.instruction as u64;
+                    npc = cpu.pc;
+                }
+                4 => {
+                    if (cpu.xr[rs1] as i64) < (cpu.xr[rs2] as i64) {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                5 => {
+                    if (cpu.xr[rs1] as i64) >= (cpu.xr[rs2] as i64) {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                6 => {
+                    if (cpu.xr[rs1] as u64) < (cpu.xr[rs2] as u64) {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                7 => {
+                    if (cpu.xr[rs1] as u64) >= (cpu.xr[rs2] as u64) {
+                        npc = cpu.pc.wrapping_add(bdisp)
+                    }
+                }
+                8..=u32::MAX => unreachable!(),
+            },
             // LB/LH/LW/LD
             // LBU/LHU/LWU/LDU
             0x03 => {
@@ -151,14 +170,28 @@ fn main() -> io::Result<()> {
                 match fn3 {
                     0 => cpu.xr[rd] = cpu.xr[rs1].wrapping_add(v),
                     1 => cpu.xr[rd] = cpu.xr[rs1] << shamt6,
-                    2 => cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) { 1 } else { 0 },
-                    3 => cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) { 1 } else { 0 },
+                    2 => {
+                        cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    3 => {
+                        cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
                     4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
-                    5 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                        ((cpu.xr[rs1] as i64) >> shamt6) as u64
-                    } else {
-                        cpu.xr[rs1] >> shamt6
-                    },
+                    5 => {
+                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                            ((cpu.xr[rs1] as i64) >> shamt6) as u64
+                        } else {
+                            cpu.xr[rs1] >> shamt6
+                        }
+                    }
                     6 => cpu.xr[rd] = cpu.xr[rs1] | v,
                     7 => cpu.xr[rd] = cpu.xr[rs1] & v,
                     8..=u32::MAX => unreachable!(),
@@ -168,20 +201,36 @@ fn main() -> io::Result<()> {
             0x33 => {
                 let v = cpu.xr[rs2];
                 match fn3 {
-                    0 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                        cpu.xr[rs1].wrapping_sub(v)
-                    } else {
-                        cpu.xr[rs1].wrapping_add(v)
-                    },
+                    0 => {
+                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                            cpu.xr[rs1].wrapping_sub(v)
+                        } else {
+                            cpu.xr[rs1].wrapping_add(v)
+                        }
+                    }
                     1 => cpu.xr[rd] = cpu.xr[rs1] << v,
-                    2 => cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) { 1 } else { 0 },
-                    3 => cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) { 1 } else { 0 },
+                    2 => {
+                        cpu.xr[rd] = if (cpu.xr[rs1] as i64) < (v as i64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    3 => {
+                        cpu.xr[rd] = if (cpu.xr[rs1] as u64) < (v as u64) {
+                            1
+                        } else {
+                            0
+                        }
+                    }
                     4 => cpu.xr[rd] = cpu.xr[rs1] ^ v,
-                    5 => cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
-                        ((cpu.xr[rs1] as i64) >> v) as u64
-                    } else {
-                        cpu.xr[rs1] >> v
-                    },
+                    5 => {
+                        cpu.xr[rd] = if ((cpu.instruction >> 30) & 1) != 0 {
+                            ((cpu.xr[rs1] as i64) >> v) as u64
+                        } else {
+                            cpu.xr[rs1] >> v
+                        }
+                    }
                     6 => cpu.xr[rd] = cpu.xr[rs1] | v,
                     7 => cpu.xr[rd] = cpu.xr[rs1] & v,
                     8..=u32::MAX => unreachable!(),
@@ -199,7 +248,7 @@ fn main() -> io::Result<()> {
                 cpu.sepc = cpu.pc;
                 cpu.stval = cpu.instruction as u64;
                 npc = cpu.pc;
-            },
+            }
 
             _ => {
                 cpu.scause = TrapCause::IllegalInstruction;
@@ -214,17 +263,19 @@ fn main() -> io::Result<()> {
         cpu.fetch(&code);
     }
 
-    println!("TRAP!\n INSN={:08X}  SCAUSE={:?} SEPC={:016X} STVAL={:016X}\n", cpu.instruction, cpu.scause, cpu.sepc, cpu.stval);
+    println!(
+        "TRAP!\n INSN={:08X}  SCAUSE={:?} SEPC={:016X} STVAL={:016X}\n",
+        cpu.instruction, cpu.scause, cpu.sepc, cpu.stval
+    );
     for x in (0..32).step_by(4) {
         print!("  X{:02}={:016X} ", x, cpu.xr[x]);
-        print!("  X{:02}={:016X} ", x+1, cpu.xr[x+1]);
-        print!("  X{:02}={:016X} ", x+2, cpu.xr[x+2]);
-        print!("  X{:02}={:016X}\n", x+3, cpu.xr[x+3]);
+        print!("  X{:02}={:016X} ", x + 1, cpu.xr[x + 1]);
+        print!("  X{:02}={:016X} ", x + 2, cpu.xr[x + 2]);
+        print!("  X{:02}={:016X}\n", x + 3, cpu.xr[x + 3]);
     }
 
     Ok(())
 }
-
 
 struct Cpu {
     pub instruction: u32,
@@ -299,21 +350,21 @@ impl Cpu {
 
     fn load_dword_unchecked(&mut self, ram: &Vec<u8>, addr: u64) -> u64 {
         let w0 = self.load_word_unchecked(ram, addr);
-        let w1 = self.load_word_unchecked(ram, addr+4);
+        let w1 = self.load_word_unchecked(ram, addr + 4);
 
         ((w1 as u64) << 32) | (w0 as u64)
     }
 
     fn load_word_unchecked(&mut self, ram: &Vec<u8>, addr: u64) -> u32 {
         let h0 = self.load_hword_unchecked(ram, addr);
-        let h1 = self.load_hword_unchecked(ram, addr+2);
+        let h1 = self.load_hword_unchecked(ram, addr + 2);
 
         ((h1 as u32) << 16) | (h0 as u32)
     }
 
     fn load_hword_unchecked(&mut self, ram: &Vec<u8>, addr: u64) -> u16 {
         let b0 = self.load_byte_unchecked(ram, addr);
-        let b1 = self.load_byte_unchecked(ram, addr+1);
+        let b1 = self.load_byte_unchecked(ram, addr + 1);
 
         ((b1 as u16) << 8) | (b0 as u16)
     }
@@ -321,7 +372,7 @@ impl Cpu {
     fn load_byte_unchecked(&mut self, ram: &Vec<u8>, addr: u64) -> u8 {
         match ram.get(addr as usize) {
             Some(b) => *b,
-            None => 0xCC
+            None => 0xCC,
         }
     }
 
@@ -353,21 +404,21 @@ impl Cpu {
         let lo = (val & 0xFFFFFFFF) as u32;
         let hi = ((val >> 8) & 0xFFFFFFFF) as u32;
         self.store_word_unchecked(ram, addr, lo);
-        self.store_word_unchecked(ram, addr+4, hi);
+        self.store_word_unchecked(ram, addr + 4, hi);
     }
 
     fn store_word_unchecked(&mut self, ram: &mut Vec<u8>, addr: u64, val: u32) {
         let lo = (val & 0xFFFF) as u16;
         let hi = ((val >> 8) & 0xFFFF) as u16;
         self.store_hword_unchecked(ram, addr, lo);
-        self.store_hword_unchecked(ram, addr+2, hi);
+        self.store_hword_unchecked(ram, addr + 2, hi);
     }
 
     fn store_hword_unchecked(&mut self, ram: &mut Vec<u8>, addr: u64, val: u16) {
         let lo = (val & 0xFF) as u8;
         let hi = ((val >> 8) & 0xFF) as u8;
         self.store_byte_unchecked(ram, addr, lo);
-        self.store_byte_unchecked(ram, addr+1, hi);
+        self.store_byte_unchecked(ram, addr + 1, hi);
     }
 
     fn store_byte_unchecked(&mut self, ram: &mut Vec<u8>, addr: u64, val: u8) {
@@ -384,12 +435,12 @@ impl Cpu {
             return false;
         }
 
-    //    if addr < 4096 {
-    //        self.scause = TrapCause::StoreAMOAccessFault;
-    //        self.sepc = self.pc;
-    //        self.stval = addr;
-    //        return false;
-    //    }
+        //    if addr < 4096 {
+        //        self.scause = TrapCause::StoreAMOAccessFault;
+        //        self.sepc = self.pc;
+        //        self.stval = addr;
+        //        return false;
+        //    }
 
         if addr >= RAM_SIZE {
             self.scause = TrapCause::StoreAMOAccessFault;
@@ -409,12 +460,12 @@ impl Cpu {
             return;
         }
 
-    //    if addr < 4096 {
-    //        self.scause = TrapCause::LoadAccessFault;
-    //        self.sepc = self.pc;
-    //        self.stval = addr;
-    //        return None;
-    //    }
+        //    if addr < 4096 {
+        //        self.scause = TrapCause::LoadAccessFault;
+        //        self.sepc = self.pc;
+        //        self.stval = addr;
+        //        return None;
+        //    }
 
         if addr >= RAM_SIZE {
             self.scause = TrapCause::LoadAccessFault;
@@ -423,4 +474,3 @@ impl Cpu {
         }
     }
 }
-
