@@ -304,7 +304,7 @@ DECIMAL
 
 : is, ( a - )
   ' >BODY @ SWAP OVER ( aJAL a aJAL )
-  - DUP ." displacement = " . cr ( aJAL disp )
+  -  ( aJAL disp )
   SWAP mergeU ;
 
 : :, ( - )
