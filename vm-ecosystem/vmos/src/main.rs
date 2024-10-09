@@ -30,7 +30,7 @@ fn extend_to_ram_size(code: &mut Vec<u8>) {
 }
 
 /// Handle table entries are of this type
-type HandleTableEntry<'emstate> = Option<Rc<RefCell<&'emstate dyn Manageable>>>;
+type HandleTableEntry<'emstate> = Option<Rc<RefCell<&'emstate mut dyn Manageable>>>;
 
 /// "Supervisor" state.  This includes things which a typical OS kernel might like to keep track
 /// of.
@@ -114,8 +114,8 @@ fn main() -> io::Result<()> {
 
     // Create initial handle table
     let mut handle_table = vec![None; 64];
-    let pi = ProgramInstance { return_code: 0, };
-    let pi = RefCell::<&dyn Manageable>::new(&pi);
+    let mut pi = ProgramInstance { return_code: 0, };
+    let pi = RefCell::<&mut dyn Manageable>::new(&mut pi);
     let pi = Rc::new(pi);
     handle_table[4] = Some(pi);
 
