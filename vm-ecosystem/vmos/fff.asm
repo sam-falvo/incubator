@@ -22,6 +22,7 @@ ecDbgOut	= $002A
 
 		align	8
 hPrg:		dword	0
+resultCode:	dword	153
 
 _start:		auipc	t0,0
 		sd	a0,hPrg-_start(t0)	; Save hProg
@@ -31,7 +32,9 @@ _start:		auipc	t0,0
 		ecall
 
 		ld	a0,hPrg-_start(t0)	; Set return code and request to exit
-		addi	a1,x0,3
+		addi	a1,x0,1
+_x:		auipc	a2,0
+		addi	a2,a2,resultCode-_x
 		addi	a7,x0,ecSetAttributes
 		ecall
 

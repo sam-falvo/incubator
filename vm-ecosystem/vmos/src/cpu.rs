@@ -100,22 +100,22 @@ impl Cpu {
         };
     }
 
-    fn load_dword(&mut self, ram: &Vec<u8>, addr: u64) -> u64 {
+    pub fn load_dword(&mut self, ram: &Vec<u8>, addr: u64) -> u64 {
         self.check_load(addr, 7);
         self.load_dword_unchecked(ram, addr)
     }
 
-    fn load_word(&mut self, ram: &Vec<u8>, addr: u64) -> u32 {
+    pub fn load_word(&mut self, ram: &Vec<u8>, addr: u64) -> u32 {
         self.check_load(addr, 3);
         self.load_word_unchecked(ram, addr)
     }
 
-    fn load_hword(&mut self, ram: &Vec<u8>, addr: u64) -> u16 {
+    pub fn load_hword(&mut self, ram: &Vec<u8>, addr: u64) -> u16 {
         self.check_load(addr, 1);
         self.load_hword_unchecked(ram, addr)
     }
 
-    fn load_byte(&mut self, ram: &Vec<u8>, addr: u64) -> u8 {
+    pub fn load_byte(&mut self, ram: &Vec<u8>, addr: u64) -> u8 {
         self.check_load(addr, 0);
         self.load_byte_unchecked(ram, addr)
     }
@@ -148,25 +148,25 @@ impl Cpu {
         }
     }
 
-    fn store_dword(&mut self, ram: &mut Vec<u8>, addr: u64, val: u64) {
+    pub fn store_dword(&mut self, ram: &mut Vec<u8>, addr: u64, val: u64) {
         if self.check_store(addr, 7) {
             self.store_dword_unchecked(ram, addr, val);
         }
     }
 
-    fn store_word(&mut self, ram: &mut Vec<u8>, addr: u64, val: u32) {
+    pub fn store_word(&mut self, ram: &mut Vec<u8>, addr: u64, val: u32) {
         if self.check_store(addr, 3) {
             self.store_word_unchecked(ram, addr, val);
         }
     }
 
-    fn store_hword(&mut self, ram: &mut Vec<u8>, addr: u64, val: u16) {
+    pub fn store_hword(&mut self, ram: &mut Vec<u8>, addr: u64, val: u16) {
         if self.check_store(addr, 1) {
             self.store_hword_unchecked(ram, addr, val);
         }
     }
 
-    fn store_byte(&mut self, ram: &mut Vec<u8>, addr: u64, val: u8) {
+    pub fn store_byte(&mut self, ram: &mut Vec<u8>, addr: u64, val: u8) {
         if self.check_store(addr, 0) {
             self.store_byte_unchecked(ram, addr, val);
         }

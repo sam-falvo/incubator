@@ -93,15 +93,16 @@ impl Manageable for ProgramInstance {
     fn close(&mut self, em: &mut EmState) {
         eprintln!("CLOSED");
         em.return_code = self.return_code;
-        em.exit_requested = self.exit_requested;
+        em.exit_requested = true;
     }
 
     fn set_attributes(&mut self, em: &mut EmState) {
         eprintln!("SETATTR");
         let mask = em.cpu.xr[11];
-        if (mask & 0x01) != 0 { self.return_code = 127; }
-        if (mask & 0x02) != 0 { self.exit_requested = true; }
-        em.cpu.xr[10] = mask & 0x03;
+        if (mask & 0x01) != 0 {
+            self.return_code = em.cpu.load_dword(&em.mem, em.cpu.xr[12]) as i64;
+        }
+        em.cpu.xr[10] = mask & 0x01;
     }
 }
 
