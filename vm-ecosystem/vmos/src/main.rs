@@ -188,23 +188,18 @@ fn call_handler(em: &mut EmState, proc: u64) {
                         // not being able to figure out why.  Compiler errors are just not helpful
                         // either.
                         // // //
-//                        let resource = em.handle_table.get_mut(which);
-//                        match resource {
-//                            Some(some_rc_refcell_obj) => {
-//                                match *some_rc_refcell_obj {
-//                                    Some(ref rc_refcell_obj) => {
-//                                        let mut obj = rc_refcell_obj.borrow_mut();
-//                                        obj.close(em);
-//                                    }
-//                                    // Handle not open
-//                                    None => break,
-//                                }
-//                            }
-//                            // Someone else already has access to the RefCell; impossible since
-//                            // we're single-threaded.
-//                            None => unreachable!(),
-//                        };
-//                        // // //
+                        let resource = &em.handle_table[which];
+                        match resource {
+                            Some(rc_refcell_obj) => {
+                                let the_obj = rc_refcell_obj.clone();
+                                let mut obj = the_obj.borrow_mut();
+                                obj.close(em);
+                            }
+
+                            // Handle is not open.
+                            None => (),
+                        };
+
 
                         em.handle_table[which] = None;
 
