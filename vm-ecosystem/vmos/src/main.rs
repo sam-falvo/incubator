@@ -43,8 +43,10 @@ struct EmState<'emstate> {
     /// available to the running virtual processor environment.
     pub handle_table: Vec<HandleTableEntry<'emstate>>,
     /// POSIX Return Code.  This will be copied from a ProgramInstance structure when that instance
-    /// is dropped.
+    /// is closed.
     pub return_code: i64,
+    /// Set to true when the program desires to quit.
+    pub exit_requested: bool,
     /// SDL context.
     pub sdl: SdlState,
     /// Event pump.
@@ -54,6 +56,7 @@ struct EmState<'emstate> {
 /// This "resource" lets a program set the return code before quitting the program.
 struct ProgramInstance {
     pub return_code: i64,
+    pub exit_requested: bool,
 }
 
 /// All resources are required to be "manageable."
@@ -90,6 +93,15 @@ impl Manageable for ProgramInstance {
     fn close(&mut self, em: &mut EmState) {
         eprintln!("CLOSED");
         em.return_code = self.return_code;
+        em.exit_requested = self.exit_requested;
+    }
+
+    fn set_attributes(&mut self, em: &mut EmState) {
+        eprintln!("SETATTR");
+        let mask = em.cpu.xr[11];
+        if (mask & 0x01) != 0 { self.return_code = 127; }
+        if (mask & 0x02) != 0 { self.exit_requested = true; }
+        em.cpu.xr[10] = mask & 0x03;
     }
 }
 
@@ -114,7 +126,7 @@ fn main() -> io::Result<()> {
 
     // Create initial handle table
     let mut handle_table = vec![None; 64];
-    let mut pi = ProgramInstance { return_code: 0, };
+    let mut pi = ProgramInstance { return_code: 0, exit_requested: false, };
     let pi = RefCell::<&mut dyn Manageable>::new(&mut pi);
     let pi = Rc::new(pi);
     handle_table[4] = Some(pi);
@@ -127,17 +139,35 @@ fn main() -> io::Result<()> {
         cpu,
         handle_table,
         return_code: 0,
+        exit_requested: false,
         sdl,
         event_pump,
     };
 
-    em.cpu.xr[10] = 4;     // Let's pretend we have a handle table for now.
-    call_handler(&mut em, 0);
+    // First callback to run is the initialization callback at address 0.  Its job is to draw the
+    // initial screen, set the initial callback handlers for various event sources of interest, and
+    // then to just return back to the central event loop.
+    //
+    // Note that if the initialization code quits the program, it takes effect immediately; the
+    // event loop never gets a chance to run.
+    //
+    // On entry:
+    // A0 = handle to the program itself.
+    // SP = top of memory.
+    //
+    // On exit:
+    // All registers except for SP are undefined.
 
-    'main_event_loop:  loop {
+    let next_proc_to_run: u64 = 0;
+    em.cpu.xr[10] = 4;
+    em.cpu.xr[2] = RAM_SIZE;
+
+    call_handler(&mut em, next_proc_to_run);
+
+    while em.exit_requested == false {
         for event in em.event_pump.wait_iter() {
             match event {
-                Event::Quit { .. } => { break 'main_event_loop }
+                Event::Quit { .. } => { em.exit_requested = true; break; }
                 _ => {},
             };
         };
@@ -169,7 +199,15 @@ fn call_handler(em: &mut EmState, proc: u64) {
 
                     // Set Attributes on a handle
                     0x0002 => {
-                        em.cpu.xr[10] = 0;     // No fields written
+                        let which = em.cpu.xr[10] as usize;
+
+                        let resource = &em.handle_table[which];
+                        if let Some(rc_refcell_obj) = resource {
+                            let the_obj = rc_refcell_obj.clone();
+                            let mut obj = the_obj.borrow_mut();
+                            obj.set_attributes(em);
+                        }
+
                         em.cpu.pc = em.cpu.sepc + 4;
                         em.cpu.scause = TrapCause::None;
                     },
@@ -178,28 +216,12 @@ fn call_handler(em: &mut EmState, proc: u64) {
                     0x0003 => {
                         let which = em.cpu.xr[10] as usize;
 
-                        // The following block of code will not compile.  I do not know why.
-                        // The purpose of this code is to invoke the Manageable::close() method
-                        // for the resource selected by which, if any.  (If none, just ignore it.)
-                        // However, for some reason, there ends up being multiple mutable borrows
-                        // involved in some places, and other type errors which happen in other
-                        // places (which is uncovered if you manipulate the code to avoid the
-                        // mutable borrows).  This ... just doesn't work.  And I am rather upset at
-                        // not being able to figure out why.  Compiler errors are just not helpful
-                        // either.
-                        // // //
                         let resource = &em.handle_table[which];
-                        match resource {
-                            Some(rc_refcell_obj) => {
-                                let the_obj = rc_refcell_obj.clone();
-                                let mut obj = the_obj.borrow_mut();
-                                obj.close(em);
-                            }
-
-                            // Handle is not open.
-                            None => (),
-                        };
-
+                        if let Some(rc_refcell_obj) = resource {
+                            let the_obj = rc_refcell_obj.clone();
+                            let mut obj = the_obj.borrow_mut();
+                            obj.close(em);
+                        }
 
                         em.handle_table[which] = None;
 
