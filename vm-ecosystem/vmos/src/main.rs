@@ -1,19 +1,18 @@
 // Inspired by code found at https://github.com/d0iasm/rvemu-for-book
 
+use std::cell::RefCell;
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::process::exit;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use sdl2::event::Event;
 
 use cpu::Cpu;
-use program_instance::ProgramInstance;
 use emul_state::{call_handler, EmState, HandleTable, Manageable};
-
+use program_instance::ProgramInstance;
 
 /// Default RAM size (1MiB).
 pub const RAM_SIZE: u64 = 1024 * 1024;
@@ -100,15 +99,18 @@ fn main() -> io::Result<()> {
     while em.exit_requested == false {
         for event in event_pump.wait_iter() {
             match event {
-                Event::Quit { .. } => { em.exit_requested = true; break; }
-                _ => {},
+                Event::Quit { .. } => {
+                    em.exit_requested = true;
+                    break;
+                }
+                _ => {}
             };
-        };
-    };
+        }
+    }
 
-    exit(em.return_code as i32);    // will never return!
+    exit(em.return_code as i32); // will never return!
 }
 
 mod cpu;
-mod program_instance;
 mod emul_state;
+mod program_instance;

@@ -133,7 +133,7 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                         em.cpu.pc = em.cpu.sepc + 4;
                         em.cpu.scause = TrapCause::None;
-                    },
+                    }
 
                     // Set Attributes on a handle
                     0x0002 => {
@@ -148,7 +148,7 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                         em.cpu.pc = em.cpu.sepc + 4;
                         em.cpu.scause = TrapCause::None;
-                    },
+                    }
 
                     // Close a handle
                     0x0003 => {

@@ -8,16 +8,12 @@ pub struct ProgramInstance {
     pub return_code: i64,
 }
 
-
 impl ProgramInstance {
     /// Constructor for a new resource
     pub fn new() -> Self {
-        Self {
-            return_code: 0,
-        }
+        Self { return_code: 0 }
     }
 }
-
 
 /// ProgramInstance resource overrides.
 impl Manageable for ProgramInstance {
@@ -26,7 +22,8 @@ impl Manageable for ProgramInstance {
         let vecbase = em.cpu.xr[12];
 
         if (mask & 0x01) != 0 {
-            em.cpu.store_dword(&mut em.mem, vecbase, self.return_code as u64);
+            em.cpu
+                .store_dword(&mut em.mem, vecbase, self.return_code as u64);
         }
 
         em.cpu.xr[10] = mask & 0x01;
