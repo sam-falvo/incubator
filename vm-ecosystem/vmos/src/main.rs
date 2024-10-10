@@ -10,7 +10,6 @@ use std::cell::RefCell;
 
 use sdl2::event::Event;
 
-use sdl_state::SdlState;
 use cpu::Cpu;
 use program_instance::ProgramInstance;
 use emul_state::{call_handler, EmState, HandleTable, Manageable};
@@ -54,10 +53,18 @@ fn main() -> io::Result<()> {
     handle_table[4] = Some(pi);
 
     // Create SDL bindings.
-    let sdl = SdlState::new(&args[1], SCR_W, SCR_H);
-    let _event_subsystem = sdl.context.event().unwrap();
-    let _timer_subsystem = sdl.context.timer().unwrap();
-    let event_pump = sdl.context.event_pump().unwrap();
+    //
+    //let _event_subsystem = sdl.event().unwrap();
+    //let _timer_subsystem = sdl.timer().unwrap();
+
+    let sdl = match sdl2::init() {
+        Ok(sdl_handle) => sdl_handle,
+        Err(_) => {
+            eprintln!("Failed to open SDL2.");
+            exit(1);
+        }
+    };
+    let mut event_pump = sdl.event_pump().unwrap();
 
     // Begin emulation
     let cpu = Cpu::new(0);
@@ -68,8 +75,6 @@ fn main() -> io::Result<()> {
         handle_table,
         return_code: 0,
         exit_requested: false,
-        sdl,
-        event_pump,
     };
 
     // First callback to run is the initialization callback at address 0.  Its job is to draw the
@@ -93,7 +98,7 @@ fn main() -> io::Result<()> {
     call_handler(&mut em, next_proc_to_run);
 
     while em.exit_requested == false {
-        for event in em.event_pump.wait_iter() {
+        for event in event_pump.wait_iter() {
             match event {
                 Event::Quit { .. } => { em.exit_requested = true; break; }
                 _ => {},
@@ -105,6 +110,5 @@ fn main() -> io::Result<()> {
 }
 
 mod cpu;
-mod sdl_state;
 mod program_instance;
 mod emul_state;

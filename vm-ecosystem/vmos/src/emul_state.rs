@@ -1,11 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use sdl2::EventPump;
-
 use crate::cpu::{Cpu, TrapCause};
-use crate::sdl_state::SdlState;
-
 
 /// Handle table entries, which refer to kernel-side resources, are of this type.
 pub type HandleTableEntry<'emstate> = Option<Rc<RefCell<&'emstate mut dyn Manageable>>>;
@@ -108,10 +104,6 @@ pub struct EmState<'emstate> {
     pub return_code: i64,
     /// Set to true when the program desires to quit.
     pub exit_requested: bool,
-    /// SDL context.
-    pub sdl: SdlState,
-    /// Event pump.
-    pub event_pump: EventPump,
 }
 
 pub fn call_handler(em: &mut EmState, proc: u64) {
