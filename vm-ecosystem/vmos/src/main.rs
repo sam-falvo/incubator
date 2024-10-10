@@ -8,11 +8,13 @@ use std::process::exit;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use cpu::{Cpu, TrapCause};
+use sdl2::event::Event;
 
 use sdl_state::SdlState;
-use sdl2::event::Event;
-use sdl2::EventPump;
+use cpu::Cpu;
+use program_instance::ProgramInstance;
+use emul_state::{call_handler, EmState, HandleTable, Manageable};
+
 
 /// Default RAM size (1MiB).
 pub const RAM_SIZE: u64 = 1024 * 1024;
@@ -29,85 +31,9 @@ fn extend_to_ram_size(code: &mut Vec<u8>) {
     }
 }
 
-/// Handle table entries are of this type
-type HandleTableEntry<'emstate> = Option<Rc<RefCell<&'emstate mut dyn Manageable>>>;
-
-/// "Supervisor" state.  This includes things which a typical OS kernel might like to keep track
-/// of.
-struct EmState<'emstate> {
-    /// The (virtual) process' memory space.
-    pub mem: Vec<u8>,
-    /// The (virtual) process' registers and such.
-    pub cpu: Cpu,
-    /// The process' handle table.  This table provides a way of making emulator-managed resources
-    /// available to the running virtual processor environment.
-    pub handle_table: Vec<HandleTableEntry<'emstate>>,
-    /// POSIX Return Code.  This will be copied from a ProgramInstance structure when that instance
-    /// is closed.
-    pub return_code: i64,
-    /// Set to true when the program desires to quit.
-    pub exit_requested: bool,
-    /// SDL context.
-    pub sdl: SdlState,
-    /// Event pump.
-    pub event_pump: EventPump,
-}
-
-/// This "resource" lets a program set the return code before quitting the program.
-struct ProgramInstance {
-    pub return_code: i64,
-    pub exit_requested: bool,
-}
-
-/// All resources are required to be "manageable."
-pub trait Manageable {
-    /// Closing a resource is required to set the corresponding handle table entry to None.
-    /// In the process, we might take some additional actions which affects the greater emulator
-    /// state.
-    fn close(&mut self, em: &mut EmState) {
-        // By default, indicate zero fields were copied.
-        em.cpu.xr[10] = 0;
-    }
-
-    /// Copies zero or more resource-specific attributes into a vector of u64s located in virtual
-    /// memory.  The resource to be queried is determined by the handle.  Depending on which fields
-    /// are specified, additional side-effects may occur.  Refer to the documentation for the
-    /// specific resource in question for more information.
-    fn get_attributes(&mut self, em: &mut EmState) {
-        // By default, indicate zero fields were copied.
-        em.cpu.xr[10] = 0;
-    }
-
-    /// Copies zero or more resource-specific attributes from a vector of u64s located in virtual
-    /// memory.  The resource to be queried is determined by the handle.  Depending on which fields
-    /// are altered, additional side-effects may occur.  Refer to the documentation for the
-    /// specific resource in question for more information.
-    fn set_attributes(&mut self, em: &mut EmState) {
-        // By default, indicate zero fields were copied.
-        em.cpu.xr[10] = 0;
-    }
-}
-
-/// ProgramInstance resource overrides.
-impl Manageable for ProgramInstance {
-    fn close(&mut self, em: &mut EmState) {
-        eprintln!("CLOSED");
-        em.return_code = self.return_code;
-        em.exit_requested = true;
-    }
-
-    fn set_attributes(&mut self, em: &mut EmState) {
-        eprintln!("SETATTR");
-        let mask = em.cpu.xr[11];
-        if (mask & 0x01) != 0 {
-            self.return_code = em.cpu.load_dword(&em.mem, em.cpu.xr[12]) as i64;
-        }
-        em.cpu.xr[10] = mask & 0x01;
-    }
-}
-
 fn main() -> io::Result<()> {
-    // Read in executable to run
+    // Read in executable to run, then expand it as needed to become the
+    // entire RAM compliment of the virtual machine.
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
@@ -119,18 +45,19 @@ fn main() -> io::Result<()> {
     file.read_to_end(&mut code)?;
     extend_to_ram_size(&mut code);
 
-    // Create SDL bindings
+    // Create initial handle table.  We pre-populate handle 4 with a handle to
+    // the currently running program.
+    let mut handle_table: HandleTable = vec![None; 64];
+    let mut pi = ProgramInstance::new();
+    let pi = RefCell::<&mut dyn Manageable>::new(&mut pi);
+    let pi = Rc::new(pi);
+    handle_table[4] = Some(pi);
+
+    // Create SDL bindings.
     let sdl = SdlState::new(&args[1], SCR_W, SCR_H);
     let _event_subsystem = sdl.context.event().unwrap();
     let _timer_subsystem = sdl.context.timer().unwrap();
     let event_pump = sdl.context.event_pump().unwrap();
-
-    // Create initial handle table
-    let mut handle_table = vec![None; 64];
-    let mut pi = ProgramInstance { return_code: 0, exit_requested: false, };
-    let pi = RefCell::<&mut dyn Manageable>::new(&mut pi);
-    let pi = Rc::new(pi);
-    handle_table[4] = Some(pi);
 
     // Begin emulation
     let cpu = Cpu::new(0);
@@ -177,75 +104,7 @@ fn main() -> io::Result<()> {
     exit(em.return_code as i32);    // will never return!
 }
 
-fn call_handler(em: &mut EmState, proc: u64) {
-    em.cpu.pc = proc;
-
-    loop {
-        em.cpu.run_until_trap(&mut em.mem);
-
-        match em.cpu.scause {
-            TrapCause::EnvironmentCallFromUmode => {
-                let function_code = em.cpu.xr[17];
-
-                match function_code {
-                    // Return from event handler
-                    0x0000 => return,
-
-                    // Get Attributes on a handle
-                    0x0001 => {
-                        em.cpu.xr[10] = 0;     // No fields read
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
-                    },
-
-                    // Set Attributes on a handle
-                    0x0002 => {
-                        let which = em.cpu.xr[10] as usize;
-
-                        let resource = &em.handle_table[which];
-                        if let Some(rc_refcell_obj) = resource {
-                            let the_obj = rc_refcell_obj.clone();
-                            let mut obj = the_obj.borrow_mut();
-                            obj.set_attributes(em);
-                        }
-
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
-                    },
-
-                    // Close a handle
-                    0x0003 => {
-                        let which = em.cpu.xr[10] as usize;
-
-                        let resource = &em.handle_table[which];
-                        if let Some(rc_refcell_obj) = resource {
-                            let the_obj = rc_refcell_obj.clone();
-                            let mut obj = the_obj.borrow_mut();
-                            obj.close(em);
-                        }
-
-                        em.handle_table[which] = None;
-
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
-                    }
-
-                    0x2A => {
-                        print!("{}", em.cpu.xr[10] as u8 as char);
-
-                        em.cpu.scause = TrapCause::None;
-                        em.cpu.pc = em.cpu.sepc + 4;
-                    }
-
-                    _ => break,
-                }
-            }
-
-            _ => break,
-        }
-    }
-}
-
 mod cpu;
 mod sdl_state;
-
+mod program_instance;
+mod emul_state;
