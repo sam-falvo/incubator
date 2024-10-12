@@ -1,13 +1,35 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+use sdl2::event::Event;
+use sdl2::libc;
 
 use crate::cpu::{Cpu, TrapCause};
 
+/// Bounds-checked signal bit identifier.
+pub struct SigBit(usize);
+
+impl SigBit {
+    /// Check signal bit to see if it falls in the range [0, 64).  If not, answer with None;
+    /// otherwise, answer with the SigBit instance.
+    pub fn new(bit: u64) -> Option<Self> {
+        if bit >= 64 {
+            None
+        } else {
+            Some(Self(bit as usize))
+        }
+    }
+
+    /// Answer with the signal bit value.
+    pub fn bit(&self) -> usize {
+        self.0
+    }
+}
+
 /// Handle table entries, which refer to kernel-side resources, are of this type.
-pub type HandleTableEntry<'emstate> = Option<Rc<RefCell<&'emstate mut dyn Manageable>>>;
+pub type HandleTableEntry = Option<Arc<Mutex<dyn Manageable>>>;
 
 /// Handle table is a vector of Handle Table Entries.
-pub type HandleTable<'emstate> = Vec<HandleTableEntry<'emstate>>;
+pub type HandleTable = Vec<HandleTableEntry>;
 
 /// All resources are required to be "manageable."  In this way, all resources can be closed,
 /// can have attributes discovered, and can have attributes altered if required.
@@ -91,19 +113,40 @@ pub trait Manageable {
 
 /// "Supervisor" state.  This includes things which a typical OS kernel might like to keep track
 /// of.
-pub struct EmState<'emstate> {
+pub struct EmState {
     /// The (virtual) process' memory space.
     pub mem: Vec<u8>,
     /// The (virtual) process' registers and such.
     pub cpu: Cpu,
     /// The process' handle table.  This table provides a way of making emulator-managed resources
     /// available to the running virtual processor environment.
-    pub handle_table: HandleTable<'emstate>,
+    pub handle_table: HandleTable,
     /// POSIX Return Code.  This will be copied from a ProgramInstance structure when that instance
     /// is closed.
     pub return_code: i64,
     /// Set to true when the program desires to quit.
     pub exit_requested: bool,
+    /// SDL2 Timer subsystem.  This allows us to allocate new timers.
+    pub timer_subsystem: sdl2::TimerSubsystem,
+    /// SDL2 Event subsystem.  This allows us to inject new messages.
+    pub event_subsystem: sdl2::EventSubsystem,
+    /// SDL2 custom event for registering timer ticks.
+    pub timer_tick: u32,
+}
+
+impl EmState {
+    /// Answer with the next free handle, or else None.
+    fn find_free_handle(&self) -> Option<usize> {
+        let mut i = 0;
+        while i < self.handle_table.len() {
+            if self.handle_table[i].is_none() {
+                return Some(i);
+            }
+
+            i = i + 1;
+        }
+        None
+    }
 }
 
 pub fn call_handler(em: &mut EmState, proc: u64) {
@@ -126,9 +169,8 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                         let resource = &em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
-                            let the_obj = rc_refcell_obj.clone();
-                            let mut obj = the_obj.borrow_mut();
-                            obj.get_attributes(em);
+                            let mut the_obj = rc_refcell_obj.lock().unwrap();
+                            the_obj.get_attributes(em);
                         }
 
                         em.cpu.pc = em.cpu.sepc + 4;
@@ -141,9 +183,8 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                         let resource = &em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
-                            let the_obj = rc_refcell_obj.clone();
-                            let mut obj = the_obj.borrow_mut();
-                            obj.set_attributes(em);
+                            let mut the_obj = rc_refcell_obj.lock().unwrap();
+                            the_obj.set_attributes(em);
                         }
 
                         em.cpu.pc = em.cpu.sepc + 4;
@@ -156,9 +197,8 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                         let resource = &em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
-                            let the_obj = rc_refcell_obj.clone();
-                            let mut obj = the_obj.borrow_mut();
-                            obj.close(em);
+                            let mut the_obj = rc_refcell_obj.lock().unwrap();
+                            the_obj.close(em);
                         }
 
                         em.handle_table[which] = None;
@@ -167,8 +207,57 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
                         em.cpu.scause = TrapCause::None;
                     }
 
-                    0x2A => {
+                    0x002A => {
                         print!("{}", em.cpu.xr[10] as u8 as char);
+
+                        em.cpu.scause = TrapCause::None;
+                        em.cpu.pc = em.cpu.sepc + 4;
+                    }
+
+                    // Create a timer.
+                    //
+                    // On Entry:
+                    // A0 = Signal bit to trigger when timer expires.
+                    // A1 = Period (note: only low 32 bits are recognized in SDL-backed versions of
+                    // VM/OS).
+                    // A2 = Non-zero if the timer is enabled; zero if the timer is disabled.
+                    //
+                    // On Exit:
+                    // A0 = non-zero if successful; zero otherwise.
+                    // A1 = If successful, the handle of the created timer instance.  Otherwise, a
+                    // reason code for the failure.
+                    //
+                    // If the timer could not be created, then A1 holds the reason code:
+                    //
+                    // - 0 -- No more handles available.
+                    // - 1 -- Signal bit out of range.
+
+                    0x0100 => {
+                        match SigBit::new(em.cpu.xr[10]) {
+                            Some(sb) => {
+                                let signal = sb;
+                                let period = em.cpu.xr[11] as u32;
+                                let enabled = if em.cpu.xr[12] != 0 { true } else { false };
+
+                                match em.find_free_handle() {
+                                    Some(which) => {
+                                        em.handle_table[which] = Some(TimerTicker::new(&em, signal, period, enabled).as_manageable());
+                                        em.cpu.xr[10] = 1;
+                                        em.cpu.xr[11] = which as u64;
+                                    }
+
+                                    None => {
+                                        em.cpu.xr[10] = 0;
+                                        em.cpu.xr[11] = 0;
+                                    }
+                                };
+                            }
+
+                            None => {
+                                em.cpu.xr[10] = 0;
+                                em.cpu.xr[11] = 1;
+                            }
+                        }
 
                         em.cpu.scause = TrapCause::None;
                         em.cpu.pc = em.cpu.sepc + 4;
@@ -182,3 +271,54 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
         }
     }
 }
+
+struct TimerTicker<'a> {
+    signal: SigBit,
+    period: u32,
+    enabled: bool,
+    ticker: Option<sdl2::timer::Timer<'a, 'a>>,
+}
+
+impl<'a> Manageable for TimerTicker<'a> {
+}
+
+impl<'a> TimerTicker<'a> {
+    pub fn new(em: &EmState, signal: SigBit, period: u32, enabled: bool) -> Self {
+        let mut ticker: Option<sdl2::timer::Timer> = None;
+
+        if enabled {
+            ticker = Some(
+                em.timer_subsystem.add_timer(
+                    period,
+                    Box::new(|| {
+                        let _ = em.event_subsystem
+                            .push_event(Event::User {
+                                timestamp: 0,
+                                window_id: 0,
+                                type_: em.timer_tick,
+                                code: signal.bit() as i32,
+                                data1: 0 as *mut libc::c_void,
+                                data2: 0 as *mut libc::c_void,
+                            })
+                            .unwrap();
+
+                        period
+                    }),
+                )
+            );
+        }
+
+        Self {
+            signal,
+            period,
+            enabled,
+            ticker,
+        }
+    }
+
+    pub fn as_manageable(self) -> Arc<Mutex<dyn Manageable>> {
+        Arc::new(Mutex::new(self))
+    }
+}
+
+

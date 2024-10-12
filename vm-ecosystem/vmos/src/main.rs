@@ -1,12 +1,10 @@
 // Inspired by code found at https://github.com/d0iasm/rvemu-for-book
 
-use std::cell::RefCell;
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::process::exit;
-use std::rc::Rc;
 
 use sdl2::event::Event;
 
@@ -46,16 +44,9 @@ fn main() -> io::Result<()> {
     // Create initial handle table.  We pre-populate handle 4 with a handle to
     // the currently running program.
     let mut handle_table: HandleTable = vec![None; 64];
-    let mut pi = ProgramInstance::new();
-    let pi = RefCell::<&mut dyn Manageable>::new(&mut pi);
-    let pi = Rc::new(pi);
-    handle_table[4] = Some(pi);
+    handle_table[4] = Some(ProgramInstance::new().as_manageable());
 
     // Create SDL bindings.
-    //
-    //let _event_subsystem = sdl.event().unwrap();
-    //let _timer_subsystem = sdl.timer().unwrap();
-
     let sdl = match sdl2::init() {
         Ok(sdl_handle) => sdl_handle,
         Err(_) => {
@@ -68,12 +59,17 @@ fn main() -> io::Result<()> {
     // Begin emulation
     let cpu = Cpu::new(0);
 
+    let event_subsystem = sdl.event().unwrap();
+
     let mut em = EmState {
         mem: code,
         cpu,
         handle_table,
         return_code: 0,
         exit_requested: false,
+        event_subsystem,
+        timer_subsystem: sdl.timer().unwrap(),
+        timer_tick: unsafe { event_subsystem.register_event().unwrap() },
     };
 
     // First callback to run is the initialization callback at address 0.  Its job is to draw the
