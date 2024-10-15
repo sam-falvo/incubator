@@ -165,46 +165,46 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                     // Get Attributes on a handle
                     0x0001 => {
+                        em.cpu.pc = em.cpu.sepc + 4;
+                        em.cpu.scause = TrapCause::None;
+
                         let which = em.cpu.xr[10] as usize;
 
-                        let resource = &em.handle_table[which];
+                        let resource = &mut em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
                             let mut the_obj = rc_refcell_obj.lock().unwrap();
                             the_obj.get_attributes(em);
                         }
-
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
                     }
 
                     // Set Attributes on a handle
                     0x0002 => {
+                        em.cpu.pc = em.cpu.sepc + 4;
+                        em.cpu.scause = TrapCause::None;
+
                         let which = em.cpu.xr[10] as usize;
 
-                        let resource = &em.handle_table[which];
+                        let resource = &mut em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
                             let mut the_obj = rc_refcell_obj.lock().unwrap();
                             the_obj.set_attributes(em);
                         }
-
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
                     }
 
                     // Close a handle
                     0x0003 => {
+                        em.cpu.pc = em.cpu.sepc + 4;
+                        em.cpu.scause = TrapCause::None;
+
                         let which = em.cpu.xr[10] as usize;
 
-                        let resource = &em.handle_table[which];
+                        let resource = &mut em.handle_table[which];
                         if let Some(rc_refcell_obj) = resource {
                             let mut the_obj = rc_refcell_obj.lock().unwrap();
                             the_obj.close(em);
                         }
 
                         em.handle_table[which] = None;
-
-                        em.cpu.pc = em.cpu.sepc + 4;
-                        em.cpu.scause = TrapCause::None;
                     }
 
                     0x002A => {
@@ -241,7 +241,7 @@ pub fn call_handler(em: &mut EmState, proc: u64) {
 
                                 match em.find_free_handle() {
                                     Some(which) => {
-                                        em.handle_table[which] = Some(TimerTicker::new(&em, signal, period, enabled).as_manageable());
+                                        em.handle_table[which] = Some(TimerTicker::new(signal, period, enabled, &mut em.timer_subsystem, &mut em.event_subsystem, em.timer_tick).as_manageable());
                                         em.cpu.xr[10] = 1;
                                         em.cpu.xr[11] = which as u64;
                                     }
@@ -283,19 +283,19 @@ impl<'a> Manageable for TimerTicker<'a> {
 }
 
 impl<'a> TimerTicker<'a> {
-    pub fn new(em: &EmState, signal: SigBit, period: u32, enabled: bool) -> Self {
+    pub fn new(signal: SigBit, period: u32, enabled: bool, timer_subsystem: &mut sdl2::TimerSubsystem, event_subsystem: &mut sdl2::EventSubsystem, timer_tick: u32) -> Self {
         let mut ticker: Option<sdl2::timer::Timer> = None;
 
         if enabled {
             ticker = Some(
-                em.timer_subsystem.add_timer(
+                timer_subsystem.add_timer(
                     period,
-                    Box::new(|| {
-                        let _ = em.event_subsystem
+                    Box::new(move || {
+                        let _ = event_subsystem
                             .push_event(Event::User {
                                 timestamp: 0,
                                 window_id: 0,
-                                type_: em.timer_tick,
+                                type_: timer_tick,
                                 code: signal.bit() as i32,
                                 data1: 0 as *mut libc::c_void,
                                 data2: 0 as *mut libc::c_void,

@@ -67,7 +67,7 @@ fn main() -> io::Result<()> {
         handle_table,
         return_code: 0,
         exit_requested: false,
-        event_subsystem,
+        event_subsystem: sdl.event().unwrap(),
         timer_subsystem: sdl.timer().unwrap(),
         timer_tick: unsafe { event_subsystem.register_event().unwrap() },
     };
