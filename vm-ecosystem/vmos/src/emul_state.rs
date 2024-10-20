@@ -276,7 +276,7 @@ struct TimerTicker<'a> {
     signal: SigBit,
     period: u32,
     enabled: bool,
-    ticker: Option<sdl2::timer::Timer<'a, 'a>>,
+    ticker: Option<Box<sdl2::timer::Timer<'a, 'a>>>,
 }
 
 impl<'a> Manageable for TimerTicker<'a> {
@@ -287,7 +287,7 @@ impl<'a> TimerTicker<'a> {
         let mut ticker: Option<sdl2::timer::Timer> = None;
 
         if enabled {
-            ticker = Some(
+            ticker = Some(Box::new(
                 timer_subsystem.add_timer(
                     period,
                     Box::new(move || {
@@ -303,9 +303,9 @@ impl<'a> TimerTicker<'a> {
                             .unwrap();
 
                         period
-                    }),
+                    })
                 )
-            );
+            ));
         }
 
         Self {
