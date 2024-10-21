@@ -9,7 +9,7 @@ use std::process::exit;
 use sdl2::event::Event;
 
 use cpu::Cpu;
-use emul_state::{call_handler, EmState, HandleTable, Manageable};
+use emul_state::{EmState, EmStateUniqueProcessId, HandleTableRepo, Manageable};
 use program_instance::ProgramInstance;
 
 /// Default RAM size (1MiB).
@@ -41,11 +41,6 @@ fn main() -> io::Result<()> {
     file.read_to_end(&mut code)?;
     extend_to_ram_size(&mut code);
 
-    // Create initial handle table.  We pre-populate handle 4 with a handle to
-    // the currently running program.
-    let mut handle_table: HandleTable = vec![None; 64];
-    handle_table[4] = Some(ProgramInstance::new().as_manageable());
-
     // Create SDL bindings.
     let sdl = match sdl2::init() {
         Ok(sdl_handle) => sdl_handle,
@@ -62,15 +57,19 @@ fn main() -> io::Result<()> {
     let event_subsystem = sdl.event().unwrap();
 
     let mut em = EmState {
+        unique_process_id: EmStateUniqueProcessId::new(),
         mem: code,
         cpu,
-        handle_table,
         return_code: 0,
         exit_requested: false,
         event_subsystem: sdl.event().unwrap(),
         timer_subsystem: sdl.timer().unwrap(),
         timer_tick: unsafe { event_subsystem.register_event().unwrap() },
     };
+
+    let mut handle_table_repo = HandleTableRepo::new();
+    handle_table_repo
+        .insert_new_handle_table(em.unique_process_id, ProgramInstance::new().as_manageable());
 
     // First callback to run is the initialization callback at address 0.  Its job is to draw the
     // initial screen, set the initial callback handlers for various event sources of interest, and
@@ -90,7 +89,7 @@ fn main() -> io::Result<()> {
     em.cpu.xr[10] = 4;
     em.cpu.xr[2] = RAM_SIZE;
 
-    call_handler(&mut em, next_proc_to_run);
+    handle_table_repo.call_handler(&mut em, next_proc_to_run);
 
     while em.exit_requested == false {
         for event in event_pump.wait_iter() {

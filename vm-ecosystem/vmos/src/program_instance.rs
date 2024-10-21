@@ -1,8 +1,6 @@
 //! Minimal, yet still useful, example of a resource that can be accessed via the
 //! handle table of a running VM/OS application.
 
-use std::sync::{Arc, Mutex};
-
 use crate::{EmState, Manageable};
 
 /// This "resource" lets a program set the return code before quitting the program.
@@ -16,8 +14,8 @@ impl ProgramInstance {
         Self { return_code: 0 }
     }
 
-    pub fn as_manageable(self) -> Arc<Mutex<dyn Manageable>> {
-        Arc::new(Mutex::new(self))
+    pub fn as_manageable(self) -> Box<dyn Manageable> {
+        Box::new(self)
     }
 }
 
